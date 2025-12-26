@@ -18,8 +18,8 @@ Designed to manage everything from your personal desktop to remote servers with 
 **Early development** – MVP in progress (v0.1.0 target: Q1 2026)
 
 Implemented so far:
-- [ ] CLI structure (Cobra)
-- [ ] YAML config parsing
+- [x] CLI structure (Cobra)
+- [x] YAML config parsing
 - [ ] File resource
 - [ ] Package resource
 - [ ] Service resource
