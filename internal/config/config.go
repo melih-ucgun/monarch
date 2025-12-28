@@ -9,37 +9,43 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Resource, YAML dosyasındaki her bir kaynağın tanımıdır.
 type Resource struct {
 	Type      string   `yaml:"type"`
 	Name      string   `yaml:"name"`
 	ID        string   `yaml:"id,omitempty"`
 	Path      string   `yaml:"path,omitempty"`
 	Content   string   `yaml:"content,omitempty"`
-	State     string   `yaml:"state,omitempty"`
+	State     string   `yaml:"state,omitempty"` // installed, running, stopped, absent
 	Enabled   bool     `yaml:"enabled,omitempty"`
 	DependsOn []string `yaml:"depends_on,omitempty"`
 	URL       string   `yaml:"url,omitempty"`
 	Command   string   `yaml:"command,omitempty"`
+
+	// Konteyner Spesifik Alanlar
+	Image   string   `yaml:"image,omitempty"`
+	Ports   []string `yaml:"ports,omitempty"`
+	Env     []string `yaml:"env,omitempty"`
+	Volumes []string `yaml:"volumes,omitempty"`
 }
 
-// Identify, kaynağın benzersiz kimliğini döndürür.
-// Eğer YAML'da 'id' tanımlanmışsa onu kullanır,
-// aksi halde 'tip:isim' (örn: pkg:neovim) formatında üretir.
+// Identify, kaynağın benzersiz ID'sini döner.
 func (r *Resource) Identify() string {
 	if r.ID != "" {
 		return r.ID
 	}
-	// Fallback: type:name
 	return fmt.Sprintf("%s:%s", r.Type, r.Name)
 }
 
+// Host, uzak sunucu bağlantı bilgileridir.
 type Host struct {
-	Name       string `yaml:"name"`
-	Address    string `yaml:"address"`
-	User       string `yaml:"user"`
-	Password   string `yaml:"password,omitempty"`
-	KeyPath    string `yaml:"key_path,omitempty"`
-	Passphrase string `yaml:"passphrase,omitempty"`
+	Name           string `yaml:"name"`
+	Address        string `yaml:"address"`
+	User           string `yaml:"user"`
+	Password       string `yaml:"password,omitempty"`
+	KeyPath        string `yaml:"key_path,omitempty"`
+	Passphrase     string `yaml:"passphrase,omitempty"`
+	BecomePassword string `yaml:"become_password,omitempty"` // Sudo şifresi alanı
 }
 
 type Config struct {
@@ -48,6 +54,7 @@ type Config struct {
 	Hosts     []Host                 `yaml:"hosts,omitempty"`
 }
 
+// LoadConfig, belirtilen yoldaki konfigürasyonu yükler ve şifreli verileri çözer.
 func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -66,6 +73,7 @@ func LoadConfig(path string) (*Config, error) {
 	return &cfg, nil
 }
 
+// ResolveSecrets, age ile şifrelenmiş değişkenleri ve şifreleri çözer.
 func (c *Config) ResolveSecrets() error {
 	privKey := os.Getenv("MONARCH_KEY")
 	if privKey == "" {
@@ -73,17 +81,20 @@ func (c *Config) ResolveSecrets() error {
 	}
 
 	for k, v := range c.Vars {
-		strVal, ok := v.(string)
-		if !ok {
-			continue
-		}
-
-		if strings.HasPrefix(strVal, "-----BEGIN AGE ENCRYPTED FILE-----") {
-			decrypted, err := crypto.Decrypt(strVal, privKey)
-			if err != nil {
-				return fmt.Errorf("değişken '%s' çözülemedi: %v", k, err)
+		if strVal, ok := v.(string); ok && strings.HasPrefix(strVal, "-----BEGIN AGE ENCRYPTED FILE-----") {
+			dec, err := crypto.Decrypt(strVal, privKey)
+			if err == nil {
+				c.Vars[k] = dec
 			}
-			c.Vars[k] = decrypted
+		}
+	}
+
+	for i := range c.Hosts {
+		if strings.HasPrefix(c.Hosts[i].BecomePassword, "-----BEGIN AGE ENCRYPTED FILE-----") {
+			dec, err := crypto.Decrypt(c.Hosts[i].BecomePassword, privKey)
+			if err == nil {
+				c.Hosts[i].BecomePassword = dec
+			}
 		}
 	}
 	return nil

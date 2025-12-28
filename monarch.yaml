@@ -12,3 +12,11 @@ resources:
       # {{ .managed_by }}
       # Welcome, {{ .user }}!
       alias {{ .alias_name }}='ls -la'
+
+resources1:
+  - name: "my-web-app"
+    type: "container"
+    image: "nginx:latest"
+    state: "running"
+    ports:
+      - "8080:80"

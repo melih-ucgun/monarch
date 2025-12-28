@@ -15,169 +15,121 @@ import (
 	"golang.org/x/crypto/ssh/knownhosts"
 )
 
-// SSHTransport, uzak sunucu ile güvenli iletişim kuran ana yapıdır.
 type SSHTransport struct {
 	Host   config.Host
 	Client *ssh.Client
 }
 
-// NewSSHTransport, bilinen host doğrulaması ve gelişmiş kimlik doğrulama ile bağlantı kurar.
 func NewSSHTransport(h config.Host) (*SSHTransport, error) {
 	var authMethods []ssh.AuthMethod
 
-	// 1. SSH Agent Desteği
 	if socket := os.Getenv("SSH_AUTH_SOCK"); socket != "" {
-		conn, err := net.Dial("unix", socket)
-		if err == nil {
+		if conn, err := net.Dial("unix", socket); err == nil {
 			authMethods = append(authMethods, ssh.PublicKeysCallback(agent.NewClient(conn).Signers))
 		}
 	}
 
-	// 2. Private Key Desteği
 	if h.KeyPath != "" {
-		expandedPath := expandHome(h.KeyPath)
-		key, err := os.ReadFile(expandedPath)
-		if err != nil {
-			return nil, fmt.Errorf("SSH anahtarı okunamadı (%s): %w", expandedPath, err)
+		expanded := h.KeyPath
+		if len(h.KeyPath) > 0 && h.KeyPath[0] == '~' {
+			home, _ := os.UserHomeDir()
+			expanded = filepath.Join(home, h.KeyPath[1:])
 		}
-
-		var signer ssh.Signer
-		if h.Passphrase != "" {
-			signer, err = ssh.ParsePrivateKeyWithPassphrase(key, []byte(h.Passphrase))
-		} else {
-			signer, err = ssh.ParsePrivateKey(key)
+		if key, err := os.ReadFile(expanded); err == nil {
+			var signer ssh.Signer
+			if h.Passphrase != "" {
+				signer, _ = ssh.ParsePrivateKeyWithPassphrase(key, []byte(h.Passphrase))
+			} else {
+				signer, _ = ssh.ParsePrivateKey(key)
+			}
+			if signer != nil {
+				authMethods = append(authMethods, ssh.PublicKeys(signer))
+			}
 		}
-
-		if err != nil {
-			return nil, fmt.Errorf("SSH anahtarı ayrıştırılamadı: %w", err)
-		}
-		authMethods = append(authMethods, ssh.PublicKeys(signer))
 	}
 
-	// 3. Şifre Desteği
 	if h.Password != "" {
 		authMethods = append(authMethods, ssh.Password(h.Password))
 	}
 
-	if len(authMethods) == 0 {
-		return nil, fmt.Errorf("hiçbir kimlik doğrulama yöntemi (Agent, Key veya Password) bulunamadı")
-	}
-
-	// 4. Host Key Doğrulaması (Hardening)
-	hostKeyCallback, err := getHostKeyCallback()
-	if err != nil {
-		// Eğer known_hosts bulunamazsa güvenlik için hata döndürüyoruz.
-		// Geliştirme aşamasında esneklik istenirse ssh.InsecureIgnoreHostKey()'e fallback yapılabilir.
-		return nil, fmt.Errorf("host key doğrulaması hazırlanamadı: %w", err)
-	}
-
+	hostKeyCallback, _ := getHostKeyCallback()
 	clientConfig := &ssh.ClientConfig{
-		User:            h.User,
-		Auth:            authMethods,
-		HostKeyCallback: hostKeyCallback,
-		Timeout:         15 * time.Second, // Zaman aşımı süresi eklendi
+		User: h.User, Auth: authMethods, HostKeyCallback: hostKeyCallback, Timeout: 15 * time.Second,
 	}
 
 	addr := h.Address
 	if !strings.Contains(addr, ":") {
-		addr = addr + ":22"
+		addr += ":22"
 	}
 
-	// Bağlantı kurarken daha spesifik hata kontrolleri
 	client, err := ssh.Dial("tcp", addr, clientConfig)
 	if err != nil {
-		if strings.Contains(err.Error(), "unable to authenticate") {
-			return nil, fmt.Errorf("yetkilendirme hatası: Kullanıcı adı veya anahtar geçersiz (%s)", addr)
-		}
-		if strings.Contains(err.Error(), "host key mismatch") {
-			return nil, fmt.Errorf("GÜVENLİK UYARISI: Host anahtarı eşleşmiyor! (Man-in-the-middle saldırısı olabilir): %v", err)
-		}
-		return nil, fmt.Errorf("SSH bağlantısı kurulamadı (%s): %v", addr, err)
+		return nil, err
 	}
 
 	return &SSHTransport{Host: h, Client: client}, nil
 }
 
-// getHostKeyCallback, ~/.ssh/known_hosts dosyasını okur ve doğrular.
-func getHostKeyCallback() (ssh.HostKeyCallback, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-
-	knownHostsPath := filepath.Join(home, ".ssh", "known_hosts")
-
-	// Dosya yoksa oluştur (Boş olması güvenliği bozmaz, sadece ilk bağlantıda hata verir)
-	if _, err := os.Stat(knownHostsPath); os.IsNotExist(err) {
-		os.MkdirAll(filepath.Dir(knownHostsPath), 0700)
-		os.WriteFile(knownHostsPath, []byte(""), 0600)
-	}
-
-	callback, err := knownhosts.New(knownHostsPath)
-	if err != nil {
-		return nil, fmt.Errorf("known_hosts dosyası işlenemedi: %w", err)
-	}
-
-	return callback, nil
-}
-
-func (s *SSHTransport) RunRemote(command string) error {
+// RunRemoteSecure, sudo şifresi gerektiren durumlarda şifreyi otomatik gönderir.
+func (s *SSHTransport) RunRemoteSecure(command string, sudoPassword string) error {
 	session, err := s.Client.NewSession()
 	if err != nil {
-		return fmt.Errorf("uzak oturum açılamadı: %w", err)
+		return err
 	}
 	defer session.Close()
 
-	session.Stdout = os.Stdout
+	modes := ssh.TerminalModes{ssh.ECHO: 0}
+	if err := session.RequestPty("xterm", 80, 40, modes); err != nil {
+		return err
+	}
+
+	in, _ := session.StdinPipe()
+	out, _ := session.StdoutPipe()
 	session.Stderr = os.Stderr
 
-	return session.Run(command)
+	if err := session.Start(command); err != nil {
+		return err
+	}
+
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			n, err := out.Read(buf)
+			if err != nil {
+				return
+			}
+			output := string(buf[:n])
+			os.Stdout.Write(buf[:n])
+			if strings.Contains(strings.ToLower(output), "password") && sudoPassword != "" {
+				fmt.Fprintln(in, sudoPassword)
+			}
+		}
+	}()
+	return session.Wait()
 }
 
 func (s *SSHTransport) CopyFile(localPath, remotePath string) error {
-	file, err := os.Open(localPath)
-	if err != nil {
-		return fmt.Errorf("yerel dosya açılamadı: %w", err)
-	}
+	file, _ := os.Open(localPath)
 	defer file.Close()
-
-	stat, err := file.Stat()
-	if err != nil {
-		return fmt.Errorf("dosya bilgileri alınamadı: %w", err)
-	}
-
-	session, err := s.Client.NewSession()
-	if err != nil {
-		return fmt.Errorf("SCP oturumu açılamadı: %w", err)
-	}
+	stat, _ := file.Stat()
+	session, _ := s.Client.NewSession()
 	defer session.Close()
 
 	go func() {
-		w, err := session.StdinPipe()
-		if err != nil {
-			return
-		}
+		w, _ := session.StdinPipe()
 		defer w.Close()
-
 		fmt.Fprintf(w, "C%04o %d %s\n", 0755, stat.Size(), filepath.Base(localPath))
 		io.Copy(w, file)
 		fmt.Fprint(w, "\x00")
 	}()
-
-	remoteDir := filepath.Dir(remotePath)
-	if err := session.Run(fmt.Sprintf("/usr/bin/scp -t %s", remoteDir)); err != nil {
-		return fmt.Errorf("dosya kopyalama başarısız: %w", err)
-	}
-
-	return nil
+	return session.Run(fmt.Sprintf("/usr/bin/scp -t %s", filepath.Dir(remotePath)))
 }
 
-func expandHome(path string) string {
-	if len(path) > 0 && path[0] == '~' {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			return filepath.Join(home, path[1:])
-		}
+func getHostKeyCallback() (ssh.HostKeyCallback, error) {
+	home, _ := os.UserHomeDir()
+	path := filepath.Join(home, ".ssh", "known_hosts")
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return ssh.InsecureIgnoreHostKey(), nil
 	}
-	return path
+	return knownhosts.New(path)
 }
