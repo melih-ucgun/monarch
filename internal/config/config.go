@@ -7,12 +7,14 @@ import (
 )
 
 type Resource struct {
-	Type    string `yaml:"type"`
-	Name    string `yaml:"name"`
-	Path    string `yaml:"path,omitempty"`    // Dosya yolu
-	Content string `yaml:"content,omitempty"` // Dosya içeriği
-	State   string `yaml:"state,omitempty"`   // running/stopped (servisler için)
-	Enabled bool   `yaml:"enabled,omitempty"`
+	Type      string   `yaml:"type"`
+	Name      string   `yaml:"name"`
+	ID        string   `yaml:"id,omitempty"` // Kaynağın benzersiz adı
+	Path      string   `yaml:"path,omitempty"`
+	Content   string   `yaml:"content,omitempty"`
+	State     string   `yaml:"state,omitempty"`
+	Enabled   bool     `yaml:"enabled,omitempty"`
+	DependsOn []string `yaml:"depends_on,omitempty"` // Bağımlı olduğu ID'lerin listesi
 }
 
 type Host struct {

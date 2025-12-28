@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/melih-ucgun/monarch/internal/config"
-	"github.com/melih-ucgun/monarch/internal/resources" // Yeni eklediğimiz paket
+	"github.com/melih-ucgun/monarch/internal/resources"
 	"github.com/spf13/cobra"
 )
 
@@ -22,12 +22,20 @@ var applyCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		// 1.5. Kaynakları Bağımlılıklara Göre Sırala (Topological Sort)
+		// Artık kaynaklar rastgele değil, aralarındaki ilişkiye göre (örn: önce paket, sonra servis) sıralanır.
+		sortedResources, err := config.SortResources(cfg.Resources)
+		if err != nil {
+			fmt.Printf("❌ Dependency Error: %v\n", err)
+			os.Exit(1)
+		}
+
 		fmt.Println("🏰 Monarch is ensuring your sovereignty...")
 		fmt.Printf("📂 Using config: %s\n", configFile)
-		fmt.Printf("🔍 Found %d resource(s) to check\n\n", len(cfg.Resources))
+		fmt.Printf("🔍 Found %d resource(s) to check\n\n", len(sortedResources))
 
-		// 2. Her bir kaynağı döngüye al ve işle
-		for _, r := range cfg.Resources {
+		// 2. Sıralanmış kaynakları döngüye al ve işle
+		for _, r := range sortedResources {
 			var res resources.Resource
 
 			// Kaynak tipine göre ilgili struct'ı oluştur
@@ -42,7 +50,7 @@ var applyCmd = &cobra.Command{
 				res = &resources.PackageResource{
 					PackageName: r.Name,
 					State:       r.State,
-					Provider:    resources.GetDefaultProvider(), // Otomatik seçim
+					Provider:    resources.GetDefaultProvider(),
 				}
 			case "service":
 				res = &resources.ServiceResource{
@@ -85,6 +93,5 @@ var applyCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(applyCmd)
-	// Hafta 5 - Step 3: --host flag'ini buraya ekle
 	applyCmd.Flags().StringP("host", "H", "localhost", "Target host for apply")
 }

@@ -36,8 +36,12 @@ func GetDefaultProvider() PackageManager {
 	if _, err := exec.LookPath("pacman"); err == nil {
 		return &PacmanProvider{}
 	}
-
-	// 2. Sistemde apt var mı kontrol et (Debian/Ubuntu için)
+	if _, err := exec.LookPath("paru"); err == nil {
+		return &ParuProvider{}
+	}
+	if _, err := exec.LookPath("yay"); err == nil {
+		return &YayProvider{}
+	}
 	if _, err := exec.LookPath("apt-get"); err == nil {
 		// return &AptProvider{} // İleride buraya AptProvider eklenebilir
 	}
