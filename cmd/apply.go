@@ -38,6 +38,17 @@ var applyCmd = &cobra.Command{
 					Path:         r.Path,
 					Content:      r.Content,
 				}
+			case "package":
+				res = &resources.PackageResource{
+					PackageName: r.Name,
+					State:       r.State,
+				}
+			case "service":
+				res = &resources.ServiceResource{
+					ServiceName:  r.Name,
+					DesiredState: r.State,
+					Enabled:      r.Enabled,
+				}
 			case "noop":
 				fmt.Printf("ℹ️ Skipping noop resource: %s\n", r.Name)
 				continue

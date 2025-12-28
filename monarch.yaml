@@ -3,3 +3,11 @@ resources:
     name: "bashrc-test"
     path: "./test_home/.bashrc"
     content: "alias ll='ls -la'\n# Managed by Monarch"
+
+  - type: package
+    name: "neovim"
+
+  - type: service 
+    name: "bluetooth"
+    state: "running"
+    enabled: true
