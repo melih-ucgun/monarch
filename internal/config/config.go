@@ -15,8 +15,16 @@ type Resource struct {
 	Enabled bool   `yaml:"enabled,omitempty"`
 }
 
+type Host struct {
+	Name     string `yaml:"name"`
+	Address  string `yaml:"address"` // Örn: 192.168.1.100:22
+	User     string `yaml:"user"`
+	Password string `yaml:"password,omitempty"` // Şimdilik basit tutuyoruz
+}
+
 type Config struct {
-	Resources []Resource `yaml:"resources"` // tag küçük harf, field büyük harf
+	Resources []Resource `yaml:"resources"`
+	Hosts     []Host     `yaml:"hosts,omitempty"` // Sunucu listesi
 }
 
 func LoadConfig(path string) (*Config, error) {

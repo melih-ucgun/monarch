@@ -84,4 +84,6 @@ var applyCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(applyCmd)
+	// Hafta 5 - Step 3: --host flag'ini buraya ekle
+	applyCmd.Flags().StringP("host", "H", "localhost", "Target host for apply")
 }
