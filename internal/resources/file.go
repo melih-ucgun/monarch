@@ -24,7 +24,6 @@ func (f *FileResource) ID() string {
 	return f.CanonicalID
 }
 
-// Check, hem içeriği hem de meta verileri kontrol eder.
 func (f *FileResource) Check() (bool, error) {
 	info, err := os.Stat(f.Path)
 	if os.IsNotExist(err) {
@@ -34,7 +33,7 @@ func (f *FileResource) Check() (bool, error) {
 		return false, err
 	}
 
-	// 1. İçerik Kontrolü
+	// 1. İçerik
 	currentContent, err := os.ReadFile(f.Path)
 	if err != nil {
 		return false, err
@@ -43,7 +42,7 @@ func (f *FileResource) Check() (bool, error) {
 		return false, nil
 	}
 
-	// 2. İzin (Mode) Kontrolü
+	// 2. İzinler
 	if f.Mode != "" {
 		targetMode, _ := strconv.ParseUint(f.Mode, 8, 32)
 		if uint32(info.Mode().Perm()) != uint32(targetMode) {
@@ -51,17 +50,17 @@ func (f *FileResource) Check() (bool, error) {
 		}
 	}
 
-	// 3. Sahiplik Kontrolü
+	// 3. Sahiplik
 	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
 		if f.Owner != "" {
-			targetUID, _ := resolveUser(f.Owner)
-			if stat.Uid != uint32(targetUID) {
+			uid, _ := resolveUser(f.Owner)
+			if uid != -1 && stat.Uid != uint32(uid) {
 				return false, nil
 			}
 		}
 		if f.Group != "" {
-			targetGID, _ := resolveGroup(f.Group)
-			if stat.Gid != uint32(targetGID) {
+			gid, _ := resolveGroup(f.Group)
+			if gid != -1 && stat.Gid != uint32(gid) {
 				return false, nil
 			}
 		}
@@ -73,24 +72,20 @@ func (f *FileResource) Check() (bool, error) {
 func (f *FileResource) Diff() (string, error) {
 	info, err := os.Stat(f.Path)
 	if os.IsNotExist(err) {
-		return fmt.Sprintf("+ file: %s (Yeni oluşturulacak)", f.Path), nil
+		return fmt.Sprintf("+ file: %s (Oluşturulacak)", f.Path), nil
 	}
 
 	diffMsg := ""
-	currentContent, _ := os.ReadFile(f.Path)
-	if string(currentContent) != f.Content {
+	current, _ := os.ReadFile(f.Path)
+	if string(current) != f.Content {
 		diffMsg += "~ İçerik değişecek\n"
 	}
 
 	if f.Mode != "" {
-		targetMode, _ := strconv.ParseUint(f.Mode, 8, 32)
-		if uint32(info.Mode().Perm()) != uint32(targetMode) {
+		m, _ := strconv.ParseUint(f.Mode, 8, 32)
+		if uint32(info.Mode().Perm()) != uint32(m) {
 			diffMsg += fmt.Sprintf("~ İzinler: %o -> %s\n", info.Mode().Perm(), f.Mode)
 		}
-	}
-
-	if f.Owner != "" || f.Group != "" {
-		diffMsg += "~ Sahiplik/Grup değişebilir\n"
 	}
 
 	if diffMsg == "" {
@@ -103,43 +98,37 @@ func (f *FileResource) Apply() error {
 	dir := filepath.Dir(f.Path)
 	os.MkdirAll(dir, 0o755)
 
-	// Dosyayı yaz
 	err := os.WriteFile(f.Path, []byte(f.Content), 0o644)
 	if err != nil {
 		return err
 	}
 
-	// İzinleri uygula
 	if f.Mode != "" {
 		m, _ := strconv.ParseUint(f.Mode, 8, 32)
 		os.Chmod(f.Path, os.FileMode(m))
 	}
 
-	// Sahipliği uygula
 	if f.Owner != "" || f.Group != "" {
 		uid, _ := resolveUser(f.Owner)
 		gid, _ := resolveGroup(f.Group)
-		// -1 değeri değişikliği atla demektir
 		os.Chown(f.Path, uid, gid)
 	}
-
 	return nil
 }
 
-// Yardımcı Fonksiyonlar: Kullanıcı adı -> UID, Grup adı -> GID
 func resolveUser(name string) (int, error) {
 	if name == "" {
 		return -1, nil
 	}
 	u, err := user.Lookup(name)
 	if err != nil {
-		// Eğer sayısal bir değerse doğrudan onu kullanmayı dene
 		if id, errID := strconv.Atoi(name); errID == nil {
 			return id, nil
 		}
 		return -1, err
 	}
-	return strconv.Atoi(u.Uid)
+	uid, _ := strconv.Atoi(u.Uid)
+	return uid, nil
 }
 
 func resolveGroup(name string) (int, error) {
@@ -153,5 +142,6 @@ func resolveGroup(name string) (int, error) {
 		}
 		return -1, err
 	}
-	return strconv.Atoi(g.Gid)
+	gid, _ := strconv.Atoi(g.Gid)
+	return gid, nil
 }

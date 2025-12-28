@@ -21,15 +21,18 @@ type Resource struct {
 	URL       string   `yaml:"url,omitempty"`
 	Command   string   `yaml:"command,omitempty"`
 
-	// Meta Veriler (İzinler ve Sahiplik)
-	Mode  string `yaml:"mode,omitempty"`  // Örn: "0644"
-	Owner string `yaml:"owner,omitempty"` // Örn: "root" veya "1000"
-	Group string `yaml:"group,omitempty"` // Örn: "docker" veya "1000"
+	// Exec Idempotency (Sadece gerektiğinde çalıştır)
+	Creates string `yaml:"creates,omitempty"`
+	OnlyIf  string `yaml:"only_if,omitempty"`
+	Unless  string `yaml:"unless,omitempty"`
 
-	// Symlink ve File Spesifik Alanlar
+	// Meta Veriler
+	Mode  string `yaml:"mode,omitempty"`
+	Owner string `yaml:"owner,omitempty"`
+	Group string `yaml:"group,omitempty"`
+
 	Target string `yaml:"target,omitempty"`
 
-	// Konteyner Spesifik Alanlar
 	Image   string   `yaml:"image,omitempty"`
 	Ports   []string `yaml:"ports,omitempty"`
 	Env     []string `yaml:"env,omitempty"`
@@ -62,16 +65,16 @@ type Config struct {
 func LoadConfig(path string) (*Config, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("konfigürasyon dosyası açılamadı: %w", err)
+		return nil, fmt.Errorf("dosya açılamadı: %w", err)
 	}
 	defer file.Close()
 
 	var cfg Config
 	decoder := yaml.NewDecoder(file)
-	decoder.KnownFields(true)
+	decoder.KnownFields(true) // Bilinmeyen alanlara izin verme
 
 	if err := decoder.Decode(&cfg); err != nil {
-		return nil, fmt.Errorf("YAML ayrıştırma hatası (şemaya uymuyor): %w", err)
+		return nil, fmt.Errorf("YAML ayrıştırma hatası: %w", err)
 	}
 
 	if err := cfg.ResolveSecrets(); err != nil {
@@ -86,7 +89,6 @@ func (c *Config) ResolveSecrets() error {
 	if privKey == "" {
 		return nil
 	}
-
 	for k, v := range c.Vars {
 		if strVal, ok := v.(string); ok && strings.HasPrefix(strVal, "-----BEGIN AGE ENCRYPTED FILE-----") {
 			dec, err := crypto.Decrypt(strVal, privKey)
@@ -95,7 +97,6 @@ func (c *Config) ResolveSecrets() error {
 			}
 		}
 	}
-
 	for i := range c.Hosts {
 		if strings.HasPrefix(c.Hosts[i].BecomePassword, "-----BEGIN AGE ENCRYPTED FILE-----") {
 			dec, err := crypto.Decrypt(c.Hosts[i].BecomePassword, privKey)
