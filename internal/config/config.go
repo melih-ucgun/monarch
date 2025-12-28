@@ -18,10 +18,12 @@ type Resource struct {
 }
 
 type Host struct {
-	Name     string `yaml:"name"`
-	Address  string `yaml:"address"` // Örn: 192.168.1.100:22
-	User     string `yaml:"user"`
-	Password string `yaml:"password,omitempty"` // Şimdilik basit tutuyoruz
+	Name       string `yaml:"name"`
+	Address    string `yaml:"address"`
+	User       string `yaml:"user"`
+	Password   string `yaml:"password,omitempty"`
+	KeyPath    string `yaml:"key_path,omitempty"`
+	Passphrase string `yaml:"passphrase,omitempty"`
 }
 
 type Config struct {
