@@ -7,17 +7,17 @@ import (
 )
 
 type ServiceResource struct {
+	CanonicalID  string
 	ServiceName  string
-	DesiredState string // "running" veya "stopped"
+	DesiredState string
 	Enabled      bool
 }
 
 func (s *ServiceResource) ID() string {
-	return fmt.Sprintf("svc:%s", s.ServiceName)
+	return s.CanonicalID
 }
 
 func (s *ServiceResource) Check() (bool, error) {
-	// 1. Aktiflik Kontrolü (is-active)
 	isActiveCmd := exec.Command("systemctl", "is-active", s.ServiceName)
 	err := isActiveCmd.Run()
 	actualState := "stopped"
@@ -25,17 +25,14 @@ func (s *ServiceResource) Check() (bool, error) {
 		actualState = "running"
 	}
 
-	// 2. Başlangıç Durumu Kontrolü (is-enabled)
 	isEnabledCmd := exec.Command("systemctl", "is-enabled", s.ServiceName)
 	enabledOut, _ := isEnabledCmd.Output()
 	actualEnabled := strings.TrimSpace(string(enabledOut)) == "enabled"
 
-	// Hem durum hem de enable bilgisi eşleşmeli
 	return (actualState == s.DesiredState) && (actualEnabled == s.Enabled), nil
 }
 
 func (s *ServiceResource) Apply() error {
-	// Durumu ayarla (start/stop)
 	action := "start"
 	if s.DesiredState == "stopped" {
 		action = "stop"
@@ -45,7 +42,6 @@ func (s *ServiceResource) Apply() error {
 		return fmt.Errorf("servis %s yapılamadı: %w", action, err)
 	}
 
-	// Başlangıç ayarını yap (enable/disable)
 	enableAction := "enable"
 	if !s.Enabled {
 		enableAction = "disable"

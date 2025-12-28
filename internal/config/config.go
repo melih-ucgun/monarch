@@ -19,6 +19,18 @@ type Resource struct {
 	Enabled   bool     `yaml:"enabled,omitempty"`
 	DependsOn []string `yaml:"depends_on,omitempty"`
 	URL       string   `yaml:"url,omitempty"`
+	Command   string   `yaml:"command,omitempty"`
+}
+
+// Identify, kaynağın benzersiz kimliğini döndürür.
+// Eğer YAML'da 'id' tanımlanmışsa onu kullanır,
+// aksi halde 'tip:isim' (örn: pkg:neovim) formatında üretir.
+func (r *Resource) Identify() string {
+	if r.ID != "" {
+		return r.ID
+	}
+	// Fallback: type:name
+	return fmt.Sprintf("%s:%s", r.Type, r.Name)
 }
 
 type Host struct {
@@ -47,7 +59,6 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
-	// Sırları çöz
 	if err := cfg.ResolveSecrets(); err != nil {
 		return nil, fmt.Errorf("sırlar çözülemedi: %w", err)
 	}
@@ -55,11 +66,9 @@ func LoadConfig(path string) (*Config, error) {
 	return &cfg, nil
 }
 
-// ResolveSecrets, vars içindeki şifreli değerleri (secret://...) bulur ve çözer.
 func (c *Config) ResolveSecrets() error {
 	privKey := os.Getenv("MONARCH_KEY")
 	if privKey == "" {
-		// Eğer ortam değişkeni yoksa şifreli değerleri atla veya uyarı ver
 		return nil
 	}
 
@@ -69,7 +78,6 @@ func (c *Config) ResolveSecrets() error {
 			continue
 		}
 
-		// Eğer değer "secret:" ile başlıyorsa çözmeye çalış
 		if strings.HasPrefix(strVal, "-----BEGIN AGE ENCRYPTED FILE-----") {
 			decrypted, err := crypto.Decrypt(strVal, privKey)
 			if err != nil {

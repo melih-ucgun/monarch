@@ -6,13 +6,8 @@ import (
 	"github.com/melih-ucgun/monarch/internal/config"
 )
 
-// New, konfigürasyondaki ham veriyi alır ve ilgili Resource nesnesini oluşturur.
-// Bu sürümde Global Templating desteği eklenmiştir: Name, Path, ID ve Content alanları
-// vars (değişkenler) ile işlenir.
 func New(r config.Resource, vars map[string]interface{}) (Resource, error) {
-	// 1. Şablonlanabilir tüm alanları bir harita üzerinden döngüyle işle
-	// r bir değer (value) olarak geldiği için üzerinde yaptığımız değişiklikler
-	// bu fonksiyonun kapsamı ile sınırlıdır ve güvenlidir.
+	// 1. Şablonlama işlemi
 	fieldsToProcess := map[string]*string{
 		"name":    &r.Name,
 		"path":    &r.Path,
@@ -30,10 +25,14 @@ func New(r config.Resource, vars map[string]interface{}) (Resource, error) {
 		}
 	}
 
-	// 2. İşlenmiş (processed) verilerle Resource tipine göre nesneyi oluştur
+	// 2. Canonical ID belirle
+	canonicalID := r.Identify()
+
+	// 3. Kaynak tipine göre nesneyi oluştur ve ID'yi enjekte et
 	switch r.Type {
 	case "file":
 		return &FileResource{
+			CanonicalID:  canonicalID,
 			ResourceName: r.Name,
 			Path:         r.Path,
 			Content:      r.Content,
@@ -41,6 +40,7 @@ func New(r config.Resource, vars map[string]interface{}) (Resource, error) {
 
 	case "package":
 		return &PackageResource{
+			CanonicalID: canonicalID,
 			PackageName: r.Name,
 			State:       r.State,
 			Provider:    GetDefaultProvider(),
@@ -48,13 +48,28 @@ func New(r config.Resource, vars map[string]interface{}) (Resource, error) {
 
 	case "service":
 		return &ServiceResource{
+			CanonicalID:  canonicalID,
 			ServiceName:  r.Name,
 			DesiredState: r.State,
 			Enabled:      r.Enabled,
 		}, nil
 
+	case "git":
+		return &GitResource{
+			CanonicalID: canonicalID,
+			URL:         r.URL,
+			Path:        r.Path,
+		}, nil
+
+	case "exec":
+		return &ExecResource{
+			CanonicalID: canonicalID,
+			Name:        r.Name,
+			Command:     r.Command,
+		}, nil
+
 	case "noop":
-		return nil, nil // İşlem yapılmayacak, hata değil.
+		return nil, nil
 
 	default:
 		return nil, fmt.Errorf("bilinmeyen kaynak tipi: %s", r.Type)
