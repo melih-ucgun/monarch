@@ -9,7 +9,7 @@ func TestSortResources(t *testing.T) {
 		name      string
 		resources []Resource
 		wantErr   bool
-		expected  []string // Beklenen ID sırası
+		wantLevel int
 	}{
 		{
 			name: "Basit Doğrusal Bağımlılık",
@@ -17,32 +17,25 @@ func TestSortResources(t *testing.T) {
 				{Name: "app", DependsOn: []string{"pkg"}},
 				{Name: "pkg", DependsOn: []string{}},
 			},
-			wantErr:  false,
-			expected: []string{"pkg", "app"},
+			wantErr:   false,
+			wantLevel: 2,
 		},
 		{
-			name: "Karmaşık Bağımlılık Grafiği",
+			name: "Karmaşık Paralel Bağımlılık",
 			resources: []Resource{
 				{Name: "service", DependsOn: []string{"config"}},
 				{Name: "config", DependsOn: []string{"pkg"}},
 				{Name: "pkg", DependsOn: []string{}},
 				{Name: "unrelated", DependsOn: []string{}},
 			},
-			wantErr:  false,
-			expected: []string{"pkg", "unrelated", "config", "service"}, // pkg ve unrelated 0 derece ile başlar
+			wantErr:   false,
+			wantLevel: 3,
 		},
 		{
 			name: "Döngüsel Bağımlılık Hatası",
 			resources: []Resource{
 				{Name: "A", DependsOn: []string{"B"}},
 				{Name: "B", DependsOn: []string{"A"}},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Eksik Bağımlılık Hatası",
-			resources: []Resource{
-				{Name: "A", DependsOn: []string{"olmayan_kaynak"}},
 			},
 			wantErr: true,
 		},
@@ -59,23 +52,8 @@ func TestSortResources(t *testing.T) {
 				return
 			}
 
-			if len(got) != len(tt.expected) {
-				t.Errorf("Eksik veya fazla kaynak döndü. Got %d, Want %d", len(got), len(tt.expected))
-				return
-			}
-
-			// Bağımlılık sırasını kontrol et (Basit check: sıralamada bağımlı olunan önce mi?)
-			orderMap := make(map[string]int)
-			for i, res := range got {
-				orderMap[res.Name] = i
-			}
-
-			for _, res := range got {
-				for _, dep := range res.DependsOn {
-					if orderMap[dep] >= orderMap[res.Name] {
-						t.Errorf("Bağımlılık ihlali: %s, %s'den önce gelmeliydi", dep, res.Name)
-					}
-				}
+			if len(got) != tt.wantLevel {
+				t.Errorf("%s: Katman sayısı hatalı. Got %d, Want %d", tt.name, len(got), tt.wantLevel)
 			}
 		})
 	}

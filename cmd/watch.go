@@ -1,12 +1,11 @@
 package cmd
 
 import (
-	"fmt"
+	"log/slog"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/melih-ucgun/monarch/internal/config"
 	"github.com/melih-ucgun/monarch/internal/engine"
 	"github.com/spf13/cobra"
@@ -14,64 +13,62 @@ import (
 
 var watchCmd = &cobra.Command{
 	Use:   "watch",
-	Short: "Sistemi sürekli gözlemler ve sapmaları raporlar",
+	Short: "Konfigürasyon dosyasını izler ve değişiklikte uygular",
 	Run: func(cmd *cobra.Command, args []string) {
 		configFile, _ := rootCmd.PersistentFlags().GetString("config")
-		interval, _ := cmd.Flags().GetInt("interval")
-		autoHeal, _ := cmd.Flags().GetBool("auto-heal")
 
-		fmt.Printf("👁️ Monarch Watch başlatıldı. (Aralık: %d saniye, Auto-Heal: %v)\n", interval, autoHeal)
-
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
-		ticker := time.NewTicker(time.Duration(interval) * time.Second)
-		defer ticker.Stop()
-
-		// İlk döngü
-		doWatch(configFile, autoHeal)
-
-		for {
-			select {
-			case <-ticker.C:
-				doWatch(configFile, autoHeal)
-			case <-sigChan:
-				fmt.Println("\n👋 Monarch Watch durduruluyor...")
-				return
-			}
+		watcher, err := fsnotify.NewWatcher()
+		if err != nil {
+			slog.Error("Watcher başlatılamadı", "error", err)
+			os.Exit(1)
 		}
+		defer watcher.Close()
+
+		go func() {
+			for {
+				select {
+				case event, ok := <-watcher.Events:
+					if !ok {
+						return
+					}
+					if event.Has(fsnotify.Write) {
+						// engine.LogTimestamp() yerine standart time paketini kullanıyoruz
+						slog.Info("Değişiklik algılandı", "file", event.Name, "at", time.Now().Format("15:04:05"))
+
+						cfg, err := config.LoadConfig(configFile)
+						if err != nil {
+							slog.Error("Config yükleme hatası", "error", err)
+							continue
+						}
+
+						recon := engine.NewReconciler(cfg, engine.EngineOptions{
+							ConfigFile: configFile,
+						})
+						_, _ = recon.Run()
+					}
+				case err, ok := <-watcher.Errors:
+					if !ok {
+						return
+					}
+					slog.Error("Watcher hatası", "error", err)
+				}
+			}
+		}()
+
+		err = watcher.Add(configFile)
+		if err != nil {
+			slog.Error("Dosya izlenemiyor", "error", err)
+			os.Exit(1)
+		}
+
+		slog.Info("👀 Monarch izlemede...", "config", configFile)
+
+		// Programın kapanmaması için sonsuz döngü
+		done := make(chan bool)
+		<-done
 	},
-}
-
-func doWatch(configFile string, autoHeal bool) {
-	engine.LogTimestamp("🔍 Kontrol ediliyor...")
-
-	cfg, err := config.LoadConfig(configFile)
-	if err != nil {
-		fmt.Printf("❌ Konfigürasyon hatası: %v\n", err)
-		return
-	}
-
-	recon := engine.NewReconciler(cfg, engine.EngineOptions{
-		AutoHeal:   autoHeal,
-		ConfigFile: configFile,
-		HostName:   "localhost", // Watch şu an sadece yerel sistem için mantıklı
-		DryRun:     false,
-	})
-
-	drifts, err := recon.Run()
-	if err != nil {
-		fmt.Printf("❌ Hata: %v\n", err)
-		return
-	}
-
-	if drifts > 0 && !autoHeal {
-		fmt.Printf("📢 Toplam %d sapma bulundu. Düzelmek için 'monarch apply' kullanın.\n", drifts)
-	}
 }
 
 func init() {
 	rootCmd.AddCommand(watchCmd)
-	watchCmd.Flags().IntP("interval", "i", 30, "Kontrol aralığı (saniye)")
-	watchCmd.Flags().BoolP("auto-heal", "a", false, "Sapmaları otomatik olarak düzelt")
 }
