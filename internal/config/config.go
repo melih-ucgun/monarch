@@ -1,20 +1,23 @@
 package config
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
+	"github.com/melih-ucgun/monarch/internal/crypto"
 	"gopkg.in/yaml.v3"
 )
 
 type Resource struct {
 	Type      string   `yaml:"type"`
 	Name      string   `yaml:"name"`
-	ID        string   `yaml:"id,omitempty"` // Kaynağın benzersiz adı
+	ID        string   `yaml:"id,omitempty"`
 	Path      string   `yaml:"path,omitempty"`
 	Content   string   `yaml:"content,omitempty"`
 	State     string   `yaml:"state,omitempty"`
 	Enabled   bool     `yaml:"enabled,omitempty"`
-	DependsOn []string `yaml:"depends_on,omitempty"` // Bağımlı olduğu ID'lerin listesi
+	DependsOn []string `yaml:"depends_on,omitempty"`
 }
 
 type Host struct {
@@ -27,7 +30,7 @@ type Host struct {
 }
 
 type Config struct {
-	Vars      map[string]interface{} `yaml:"vars,omitempty"` // Global değişkenler
+	Vars      map[string]interface{} `yaml:"vars,omitempty"`
 	Resources []Resource             `yaml:"resources"`
 	Hosts     []Host                 `yaml:"hosts,omitempty"`
 }
@@ -43,5 +46,36 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
+	// Sırları çöz
+	if err := cfg.ResolveSecrets(); err != nil {
+		return nil, fmt.Errorf("sırlar çözülemedi: %w", err)
+	}
+
 	return &cfg, nil
+}
+
+// ResolveSecrets, vars içindeki şifreli değerleri (secret://...) bulur ve çözer.
+func (c *Config) ResolveSecrets() error {
+	privKey := os.Getenv("MONARCH_KEY")
+	if privKey == "" {
+		// Eğer ortam değişkeni yoksa şifreli değerleri atla veya uyarı ver
+		return nil
+	}
+
+	for k, v := range c.Vars {
+		strVal, ok := v.(string)
+		if !ok {
+			continue
+		}
+
+		// Eğer değer "secret:" ile başlıyorsa çözmeye çalış
+		if strings.HasPrefix(strVal, "-----BEGIN AGE ENCRYPTED FILE-----") {
+			decrypted, err := crypto.Decrypt(strVal, privKey)
+			if err != nil {
+				return fmt.Errorf("değişken '%s' çözülemedi: %v", k, err)
+			}
+			c.Vars[k] = decrypted
+		}
+	}
+	return nil
 }
