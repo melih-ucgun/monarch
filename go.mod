@@ -5,6 +5,7 @@ go 1.25.5
 require (
 	filippo.io/age v1.3.1
 	github.com/fsnotify/fsnotify v1.9.0
+	github.com/pkg/sftp v1.13.10
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/crypto v0.46.0
 	golang.org/x/sync v0.19.0
@@ -15,6 +16,7 @@ require (
 require (
 	filippo.io/hpke v0.4.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/kr/fs v0.1.0 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	golang.org/x/sys v0.39.0 // indirect

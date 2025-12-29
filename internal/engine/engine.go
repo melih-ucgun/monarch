@@ -127,6 +127,7 @@ func (e *Reconciler) runRemote() (int, error) {
 		return 0, err
 	}
 
+	// GÜNCELLEME 1: Hazır binary kullan (anlık derleme yerine)
 	binaryPath, err := resolveBinaryPath(remoteOS, remoteArch)
 	if err != nil {
 		return 0, err
@@ -136,6 +137,7 @@ func (e *Reconciler) runRemote() (int, error) {
 	remoteBinPath := fmt.Sprintf("/tmp/monarch-%s", timestamp)
 	remoteCfgPath := fmt.Sprintf("/tmp/monarch-%s.yaml", timestamp)
 
+	// Binary'yi ve config'i kopyala
 	if err := t.CopyFile(binaryPath, remoteBinPath); err != nil {
 		return 0, err
 	}
@@ -143,6 +145,7 @@ func (e *Reconciler) runRemote() (int, error) {
 		return 0, err
 	}
 
+	// Uzak sunucuda çalıştır
 	runCmd := fmt.Sprintf("chmod +x %s && %s apply --config %s", remoteBinPath, remoteBinPath, remoteCfgPath)
 	if e.Opts.DryRun {
 		runCmd += " --dry-run"
@@ -153,59 +156,73 @@ func (e *Reconciler) runRemote() (int, error) {
 		return 0, fmt.Errorf("uzak sunucu hatası: %w", err)
 	}
 
-	// Merkezi State Senkronizasyonu
+	// GÜNCELLEME 2: Güvenli SFTP ile State Senkronizasyonu
 	if !e.Opts.DryRun {
-		stateContent, fetchErr := t.CaptureRemoteOutput("cat .monarch/state.json")
-		if fetchErr == nil {
-			var remoteState State
-			if jsonErr := json.Unmarshal([]byte(stateContent), &remoteState); jsonErr == nil {
-				e.stateMutex.Lock()
-				e.State.Merge(&remoteState)
-				_ = e.State.Save()
-				e.stateMutex.Unlock()
-				slog.Info("Uzak state senkronize edildi.")
+		localTempState := fmt.Sprintf("/tmp/monarch-state-%s.json", timestamp)
+		// Uzak yoldaki .monarch klasörünü kullanıcının home dizinine göre ayarlıyoruz
+		// (Genelde .monarch/state.json home dizininde olur)
+		remoteStatePath := ".monarch/state.json"
+
+		// SFTP ile indir
+		downloadErr := t.DownloadFile(remoteStatePath, localTempState)
+		if downloadErr == nil {
+			// Başarıyla indi, oku
+			fileData, readErr := os.ReadFile(localTempState)
+			if readErr == nil {
+				var remoteState State
+				if jsonErr := json.Unmarshal(fileData, &remoteState); jsonErr == nil {
+					e.stateMutex.Lock()
+					e.State.Merge(&remoteState)
+					_ = e.State.Save()
+					e.stateMutex.Unlock()
+					slog.Info("Uzak state senkronize edildi.")
+				} else {
+					slog.Warn("Uzak state JSON formatı hatalı, atlanıyor.", "error", jsonErr)
+				}
 			}
+			// Temizlik: Yerel geçici dosyayı sil
+			_ = os.Remove(localTempState)
+		} else {
+			// İlk kurulumda dosya olmayabilir, bu normaldir.
+			slog.Debug("Uzak state indirilemedi (dosya yok veya erişim hatası).", "error", downloadErr)
 		}
 	}
 
+	// Uzak sunucudaki geçici dosyaları temizle
 	_ = t.RunRemoteSecure(fmt.Sprintf("rm -f %s %s", remoteBinPath, remoteCfgPath), "")
 	return 0, nil
 }
 
-// internal/engine/engine.go
-
+// resolveBinaryPath, hedef sisteme uygun binary dosyasını bulur.
+// Anlık derleme (go build) yerine, önceden derlenmiş dosyayı arar.
 func resolveBinaryPath(targetOS, targetArch string) (string, error) {
-	// 1. Senaryo: Hedef sistem ile mevcut sistem aynıysa (Örn: Linux/AMD64 -> Linux/AMD64)
-	// Kendi çalışan binary'mizi kullanırız.
+	// 1. Hedef sistem ile mevcut sistem aynıysa kendisini kullanır.
 	if targetOS == runtime.GOOS && targetArch == runtime.GOARCH {
 		return os.Executable()
 	}
 
-	// 2. Senaryo: Hedef sistem farklı (Örn: Linux/AMD64 -> Linux/ARM64)
-	// Yanımızda hazır bulunması gereken binary dosyasının adını oluşturuyoruz.
-	// Örnek Beklenen Dosya Adı: monarch-linux-arm64
+	// 2. Hedef farklıysa, yan dizindeki hazır binary'yi arar.
+	// İsimlendirme standardı: monarch-{os}-{arch} (örn: monarch-linux-arm64)
 	expectedBinaryName := fmt.Sprintf("monarch-%s-%s", targetOS, targetArch)
 
-	// Çalışan binary'nin bulunduğu dizini alıyoruz (böylece terminali nereden açtığınız fark etmez)
 	exePath, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("çalışan dosya yolu bulunamadı: %w", err)
 	}
 	exeDir := filepath.Dir(exePath)
 
-	// Tam dosya yolunu oluşturuyoruz
 	fullPath := filepath.Join(exeDir, expectedBinaryName)
 
-	// 3. Kontrol: Bu dosya gerçekten var mı?
+	// Dosyanın varlığını kontrol et
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		return "", fmt.Errorf(
-			"HATA: Hedef sistem (%s/%s) için gerekli binary bulunamadı.\n"+
-				"Beklenen dosya: %s\n"+
-				"ÇÖZÜM: Lütfen ilgili mimari için derlenmiş 'monarch' dosyasını bu klasöre koyun.",
-			targetOS, targetArch, fullPath,
+			"HATA: Hedef sistem (%s/%s) için gerekli binary dosyası bulunamadı.\n"+
+				"Aranan dosya: %s\n"+
+				"ÇÖZÜM: Lütfen hedef mimari için derlenmiş 'monarch' dosyasını bu dizine koyun.\n"+
+				"Örnek komut: GOOS=%s GOARCH=%s go build -o %s main.go",
+			targetOS, targetArch, fullPath, targetOS, targetArch, expectedBinaryName,
 		)
 	}
 
-	// Dosya varsa yolunu döndür
 	return fullPath, nil
 }
