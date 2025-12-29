@@ -1,57 +1,72 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"syscall"
+	"os/signal"
 
 	"github.com/melih-ucgun/monarch/internal/config"
 	"github.com/melih-ucgun/monarch/internal/engine"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
+// applyCmd represents the apply command
 var applyCmd = &cobra.Command{
 	Use:   "apply",
-	Short: "Sistemi arzu edilen duruma getirir",
+	Short: "Konfigürasyonu uygular (Apply configuration)",
+	Long:  `Belirtilen konfigürasyon dosyasını okuyarak sistem durumunu günceller.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		configFile, _ := rootCmd.PersistentFlags().GetString("config")
-		hostName, _ := cmd.Flags().GetString("host")
+		cfgFile, _ := cmd.Flags().GetString("config")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
-		askSudo, _ := cmd.Flags().GetBool("ask-sudo")
+		host, _ := cmd.Flags().GetString("host")
 
-		cfg, err := config.LoadConfig(configFile)
+		// 1. Context Oluşturma: Sinyalleri (Ctrl+C) yakala
+		// Background context üzerine iptal edilebilir (WithCancel) bir yapı kuruyoruz.
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer cancel() // Fonksiyon biterken temizlik yap
+
+		// İsterseniz burada bir Timeout da ekleyebilirsiniz:
+		// ctx, cancel = context.WithTimeout(ctx, 30*time.Minute)
+
+		cfg, err := config.LoadConfig(cfgFile)
 		if err != nil {
-			fmt.Printf("❌ Hata: %v\n", err)
+			fmt.Printf("Konfigürasyon hatası: %v\n", err)
 			os.Exit(1)
 		}
 
-		if askSudo {
-			fmt.Printf("🔑 [Sudo] %s için şifre: ", hostName)
-			pass, _ := term.ReadPassword(int(syscall.Stdin))
-			fmt.Println()
-			for i := range cfg.Hosts {
-				if cfg.Hosts[i].Name == hostName {
-					cfg.Hosts[i].BecomePassword = string(pass)
-				}
+		opts := engine.EngineOptions{
+			DryRun:     dryRun,
+			HostName:   host,
+			ConfigFile: cfgFile,
+		}
+
+		rec := engine.NewReconciler(cfg, opts)
+
+		// 2. Engine'i Context ile Başlat
+		drifts, err := rec.Run(ctx)
+
+		// 3. Hata Yönetimi: İptal mi edildi yoksa hata mı var?
+		if err != nil {
+			if err == context.Canceled {
+				fmt.Println("\n❌ İşlem kullanıcı tarafından iptal edildi.")
+				os.Exit(130) // 130 = SIGINT çıkış kodu standardı
 			}
-		}
-
-		recon := engine.NewReconciler(cfg, engine.EngineOptions{
-			DryRun: dryRun, HostName: hostName, ConfigFile: configFile,
-		})
-
-		if _, err := recon.Run(); err != nil {
-			fmt.Printf("❌ Hata: %v\n", err)
+			fmt.Printf("\n❌ Hata oluştu: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Println("\n🏁 Monarch işlemi tamamladı.")
+
+		if drifts == 0 {
+			fmt.Println("\n✅ Sistem zaten istenen durumda.")
+		} else {
+			fmt.Printf("\n✅ %d değişiklik uygulandı.\n", drifts)
+		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(applyCmd)
-	applyCmd.Flags().BoolP("dry-run", "d", false, "Değişiklikleri uygulama")
-	applyCmd.Flags().StringP("host", "H", "localhost", "Hedef sunucu")
-	applyCmd.Flags().Bool("ask-sudo", false, "Sudo şifresini sor")
+	applyCmd.Flags().StringP("config", "c", "monarch.yaml", "Konfigürasyon dosyası")
+	applyCmd.Flags().Bool("dry-run", false, "Değişiklik yapmadan ne olacağını göster")
+	applyCmd.Flags().String("host", "", "Uzak sunucu adı (hosts listesindeki name)")
 }
