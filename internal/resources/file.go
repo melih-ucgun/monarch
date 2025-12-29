@@ -1,12 +1,13 @@
 package resources
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 )
 
@@ -94,22 +95,20 @@ func (f *FileResource) Diff() (string, error) {
 	return fmt.Sprintf("! %s:\n%s", f.Path, diffMsg), nil
 }
 
-// Apply artık ATOMİK çalışır.
-// Dosyayı önce geçici bir isme yazar, sonra rename yapar.
+// Apply ATOMİK çalışır ve CGO gerektirmez.
 func (f *FileResource) Apply() error {
 	dir := filepath.Dir(f.Path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("hedef dizin oluşturulamadı: %w", err)
 	}
 
-	// 1. Geçici dosya oluştur (Aynı dizinde olmalı ki rename işlemi atomik olsun)
+	// 1. Geçici dosya oluştur
 	tmpFile, err := os.CreateTemp(dir, ".monarch-tmp-*")
 	if err != nil {
 		return fmt.Errorf("geçici dosya oluşturulamadı: %w", err)
 	}
 	tmpName := tmpFile.Name()
 
-	// İşlem başarısız olursa geçici dosyayı temizle
 	success := false
 	defer func() {
 		tmpFile.Close() // Dosyayı kapatmayı garantiye al
@@ -123,39 +122,36 @@ func (f *FileResource) Apply() error {
 		return fmt.Errorf("dosya içeriği yazılamadı: %w", err)
 	}
 
-	// 3. Diske senkronize et (Veri bütünlüğü için kritik)
-	// Bu işlem verinin işletim sistemi tamponundan diske fiziksel olarak yazılmasını zorlar.
+	// 3. Diske senkronize et (Sync)
 	if err := tmpFile.Sync(); err != nil {
 		return fmt.Errorf("disk senkronizasyonu hatası: %w", err)
 	}
 
-	// 4. Dosyayı kapat (Rename etmeden önce kapatmak şarttır)
+	// 4. Dosyayı kapat
 	if err := tmpFile.Close(); err != nil {
 		return fmt.Errorf("dosya kapatılamadı: %w", err)
 	}
 
-	// 5. İzinleri ve Sahipliği ayarla (Rename öncesi yapılmalı)
-	// Böylece dosya görünür olduğunda zaten doğru izinlere sahip olur.
+	// 5. İzinleri ve Sahipliği ayarla
 	if f.Mode != "" {
 		m, _ := strconv.ParseUint(f.Mode, 8, 32)
 		if err := os.Chmod(tmpName, os.FileMode(m)); err != nil {
 			return fmt.Errorf("izinler ayarlanamadı: %w", err)
 		}
 	} else {
-		// Varsayılan izin (orijinal kodda olduğu gibi)
 		os.Chmod(tmpName, 0o644)
 	}
 
 	if f.Owner != "" || f.Group != "" {
 		uid, _ := resolveUser(f.Owner)
 		gid, _ := resolveGroup(f.Group)
+		// Not: Chown işlemi genellikle root yetkisi gerektirir.
 		if err := os.Chown(tmpName, uid, gid); err != nil {
-			return fmt.Errorf("sahiplik ayarlanamadı: %w", err)
+			return fmt.Errorf("sahiplik ayarlanamadı (root musunuz?): %w", err)
 		}
 	}
 
-	// 6. Atomik Taşıma (Atomic Rename)
-	// Eski dosya varsa güvenli bir şekilde ezilir.
+	// 6. Atomik Taşıma
 	if err := os.Rename(tmpName, f.Path); err != nil {
 		return fmt.Errorf("atomik taşıma başarısız: %w", err)
 	}
@@ -164,32 +160,88 @@ func (f *FileResource) Apply() error {
 	return nil
 }
 
+// resolveUser: /etc/passwd dosyasını okuyarak kullanıcı adını UID'ye çevirir.
+// CGO (os/user) kullanmaz, böylece statik binary olarak derlenebilir.
 func resolveUser(name string) (int, error) {
 	if name == "" {
 		return -1, nil
 	}
-	u, err := user.Lookup(name)
+
+	// Eğer input zaten sayıysa (örn: "1000"), direkt döndür.
+	if id, err := strconv.Atoi(name); err == nil {
+		return id, nil
+	}
+
+	f, err := os.Open("/etc/passwd")
 	if err != nil {
-		if id, errID := strconv.Atoi(name); errID == nil {
-			return id, nil
+		return -1, fmt.Errorf("passwd dosyası okunamadı: %w", err)
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// Yorum satırlarını veya boş satırları atla
+		if strings.HasPrefix(line, "#") || strings.TrimSpace(line) == "" {
+			continue
 		}
+
+		// Format: username:password:uid:gid:gecos:home:shell
+		parts := strings.Split(line, ":")
+		if len(parts) > 2 && parts[0] == name {
+			uid, err := strconv.Atoi(parts[2])
+			if err != nil {
+				return -1, fmt.Errorf("geçersiz uid formatı: %w", err)
+			}
+			return uid, nil
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
 		return -1, err
 	}
-	uid, _ := strconv.Atoi(u.Uid)
-	return uid, nil
+
+	return -1, fmt.Errorf("kullanıcı bulunamadı: %s", name)
 }
 
+// resolveGroup: /etc/group dosyasını okuyarak grup adını GID'ye çevirir.
+// CGO kullanmaz.
 func resolveGroup(name string) (int, error) {
 	if name == "" {
 		return -1, nil
 	}
-	g, err := user.LookupGroup(name)
+
+	if id, err := strconv.Atoi(name); err == nil {
+		return id, nil
+	}
+
+	f, err := os.Open("/etc/group")
 	if err != nil {
-		if id, errID := strconv.Atoi(name); errID == nil {
-			return id, nil
+		return -1, fmt.Errorf("group dosyası okunamadı: %w", err)
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "#") || strings.TrimSpace(line) == "" {
+			continue
 		}
+
+		// Format: groupname:password:gid:userlist
+		parts := strings.Split(line, ":")
+		if len(parts) > 2 && parts[0] == name {
+			gid, err := strconv.Atoi(parts[2])
+			if err != nil {
+				return -1, fmt.Errorf("geçersiz gid formatı: %w", err)
+			}
+			return gid, nil
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
 		return -1, err
 	}
-	gid, _ := strconv.Atoi(g.Gid)
-	return gid, nil
+
+	return -1, fmt.Errorf("grup bulunamadı: %s", name)
 }
