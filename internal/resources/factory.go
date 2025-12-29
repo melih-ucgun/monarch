@@ -6,73 +6,168 @@ import (
 	"github.com/melih-ucgun/monarch/internal/config"
 )
 
-// New, konfigürasyondan gelen veriyi işleyerek somut bir Resource nesnesi oluşturur.
-func New(r config.Resource, vars map[string]interface{}) (Resource, error) {
-	// İşlenecek alanları bir haritada topluyoruz
-	fieldsToProcess := map[string]*string{
-		"name":    &r.Name,
-		"path":    &r.Path,
-		"content": &r.Content,
-		"image":   &r.Image,
-		"target":  &r.Target,
-		"mode":    &r.Mode,
-		"owner":   &r.Owner,
-		"group":   &r.Group,
-		"command": &r.Command,
-		"creates": &r.Creates,
-		"only_if": &r.OnlyIf,
-		"unless":  &r.Unless,
-	}
-
-	// Her bir alanı template motorundan geçiriyoruz
-	for fieldName, val := range fieldsToProcess {
-		if *val != "" {
-			processed, err := config.ExecuteTemplate(*val, vars)
-			if err != nil {
-				return nil, fmt.Errorf("kaynak '%s' için '%s' alanı işlenirken şablon hatası: %w", r.Name, fieldName, err)
-			}
-			*val = processed
-		}
-	}
-
-	id := r.Identify()
-	switch r.Type {
+func New(cfg config.ResourceConfig, vars map[string]string) (Resource, error) {
+	switch cfg.Type {
 	case "file":
+		mode := "0644"
+		if m, ok := cfg.Parameters["mode"].(string); ok {
+			mode = m
+		}
+		content := ""
+		if c, ok := cfg.Parameters["content"].(string); ok {
+			content = c
+		}
+		path := ""
+		if p, ok := cfg.Parameters["path"].(string); ok {
+			path = p
+		}
+
 		return &FileResource{
-			CanonicalID: id, ResourceName: r.Name, Path: r.Path,
-			Content: r.Content, Mode: r.Mode, Owner: r.Owner, Group: r.Group,
+			CanonicalID: cfg.ID,
+			Path:        path,
+			Content:     content,
+			Mode:        mode,
 		}, nil
+
 	case "exec":
+		cmd := ""
+		if c, ok := cfg.Parameters["command"].(string); ok {
+			cmd = c
+		}
+		unless := ""
+		if u, ok := cfg.Parameters["unless"].(string); ok {
+			unless = u
+		}
+		runAs := ""
+		if r, ok := cfg.Parameters["run_as"].(string); ok {
+			runAs = r
+		}
+
 		return &ExecResource{
-			CanonicalID: id, Name: r.Name, Command: r.Command,
-			Creates: r.Creates, OnlyIf: r.OnlyIf, Unless: r.Unless,
+			CanonicalID: cfg.ID,
+			Command:     cmd,
+			Unless:      unless,
+			RunAsUser:   runAs,
 		}, nil
+
 	case "package":
-		return &PackageResource{CanonicalID: id, PackageName: r.Name, State: r.State, Provider: GetDefaultProvider()}, nil
+		name := ""
+		if n, ok := cfg.Parameters["name"].(string); ok {
+			name = n
+		}
+
+		mgrName := "pacman"
+		if m, ok := cfg.Parameters["manager"].(string); ok {
+			mgrName = m
+		}
+
+		state := "installed"
+		if s, ok := cfg.Parameters["state"].(string); ok {
+			state = s
+		}
+
+		return &PackageResource{
+			CanonicalID: cfg.ID,
+			Name:        name,
+			ManagerName: mgrName,
+			State:       state,
+		}, nil
+
 	case "service":
-		return &ServiceResource{CanonicalID: id, ServiceName: r.Name, DesiredState: r.State, Enabled: r.Enabled}, nil
+		name := ""
+		if n, ok := cfg.Parameters["name"].(string); ok {
+			name = n
+		}
+
+		state := "started"
+		if s, ok := cfg.Parameters["state"].(string); ok {
+			state = s
+		}
+
+		enabled := true
+		if e, ok := cfg.Parameters["enabled"].(bool); ok {
+			enabled = e
+		}
+
+		return &ServiceResource{
+			CanonicalID: cfg.ID,
+			Name:        name,
+			State:       state,
+			Enabled:     enabled,
+		}, nil
+
+	case "git":
+		repo := ""
+		if r, ok := cfg.Parameters["repo"].(string); ok {
+			repo = r
+		}
+		dest := ""
+		if d, ok := cfg.Parameters["dest"].(string); ok {
+			dest = d
+		}
+		branch := ""
+		if b, ok := cfg.Parameters["branch"].(string); ok {
+			branch = b
+		}
+
+		return &GitResource{
+			RepoURL: repo,
+			Dest:    dest,
+			Branch:  branch,
+		}, nil
+
+	case "symlink":
+		target := ""
+		if t, ok := cfg.Parameters["target"].(string); ok {
+			target = t
+		}
+		link := ""
+		if l, ok := cfg.Parameters["link"].(string); ok {
+			link = l
+		}
+		force := false
+		if f, ok := cfg.Parameters["force"].(bool); ok {
+			force = f
+		}
+
+		return &SymlinkResource{
+			Target: target,
+			Link:   link,
+			Force:  force,
+		}, nil
+
 	case "container":
-		// HATA ÇÖZÜMÜ: map[string]string olan r.Env'yi []string ("KEY=VALUE") formatına çeviriyoruz.
-		var envList []string
-		for k, v := range r.Env {
-			envList = append(envList, fmt.Sprintf("%s=%s", k, v))
+		name := ""
+		if n, ok := cfg.Parameters["name"].(string); ok {
+			name = n
+		}
+		image := ""
+		if i, ok := cfg.Parameters["image"].(string); ok {
+			image = i
+		}
+		state := "running"
+		if s, ok := cfg.Parameters["state"].(string); ok {
+			state = s
+		}
+
+		// Portları []interface{}'den []string'e çevir
+		var ports []string
+		if pList, ok := cfg.Parameters["ports"].([]interface{}); ok {
+			for _, p := range pList {
+				if pStr, ok := p.(string); ok {
+					ports = append(ports, pStr)
+				}
+			}
 		}
 
 		return &ContainerResource{
-			CanonicalID: id,
-			Name:        r.Name,
-			Image:       r.Image,
-			State:       r.State,
-			Ports:       r.Ports,
-			Env:         envList, // Artık slice tipinde gönderiyoruz
-			Volumes:     r.Volumes,
-			Engine:      GetContainerEngine(),
+			Name:  name,
+			Image: image,
+			State: state,
+			Ports: ports,
 		}, nil
-	case "symlink":
-		return &SymlinkResource{CanonicalID: id, Path: r.Path, Target: r.Target}, nil
-	case "git":
-		return &GitResource{CanonicalID: id, URL: r.URL, Path: r.Path}, nil
+
 	default:
-		return nil, fmt.Errorf("bilinmeyen kaynak tipi: %s", r.Type)
+		return nil, fmt.Errorf("bilinmeyen kaynak tipi: %s", cfg.Type)
 	}
 }

@@ -3,6 +3,7 @@ package resources
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -157,6 +158,27 @@ func (f *FileResource) Apply() error {
 	}
 
 	success = true
+	return nil
+}
+
+// Undo, dosya kaynağını sistemden kaldırır (Detach işlemi).
+func (f *FileResource) Undo(ctx context.Context) error {
+	// 1. Dosya var mı kontrol et
+	if _, err := os.Stat(f.Path); os.IsNotExist(err) {
+		// Zaten yoksa işlem başarılıdır (Idempotency)
+		return nil
+	}
+
+	// 2. Context iptal edildi mi kontrol et
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	// 3. Dosyayı sil
+	if err := os.Remove(f.Path); err != nil {
+		return fmt.Errorf("dosya silinemedi [%s]: %w", f.Path, err)
+	}
+
 	return nil
 }
 

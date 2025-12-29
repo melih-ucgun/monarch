@@ -1,63 +1,37 @@
 package config
 
-import (
-	"fmt"
-)
+// SortResources, kaynakları bağımlılıklarına göre sıralar (Topological Sort).
+// Not: Şu anki versiyonda sadece ResourceConfig listesini "level" (katman) mantığına göre
+// ayırabiliriz veya basitçe sıralı döndürebiliriz.
+// İleride "depends_on" alanı eklenirse burası gerçek bir DAG (Graph) algoritması içermeli.
+func SortResources(resources [][]ResourceConfig) ([][]ResourceConfig, error) {
+	// Şimdilik konfigürasyon dosyasındaki sıraya sadık kalıyoruz.
+	// resources zaten [][]ResourceConfig tipinde olduğu için ekstra bir dönüşüm gerekmez.
 
-// SortResources, kaynakları bağımlılıklarına göre paralel çalışabilecek seviyelere (layer) ayırır.
-func SortResources(resources []Resource) ([][]Resource, error) {
-	adj := make(map[string][]string)
-	inDegree := make(map[string]int)
-	resMap := make(map[string]Resource)
+	// Eğer düz bir liste gelirse ve biz bunu katmanlara ayırmak istiyorsak
+	// burada işlem yapılabilir. Ancak şu anki config yapısı (YAML) zaten katmanlı (array of arrays)
+	// veya gruplu geldiği için olduğu gibi dönebiliriz.
 
-	// Kaynak haritasını ve giriş derecelerini (in-degree) hazırla
-	for _, r := range resources {
-		resMap[r.Name] = r
-		if _, ok := inDegree[r.Name]; !ok {
-			inDegree[r.Name] = 0
-		}
-		for _, dep := range r.DependsOn {
-			adj[dep] = append(adj[dep], r.Name)
-			inDegree[r.Name]++
-		}
+	// Örnek basit validasyon:
+	if len(resources) == 0 {
+		return nil, nil // Boş ise hata değil, boş liste dön
 	}
 
-	// Bağımlılıkların mevcut olup olmadığını kontrol et
-	for _, r := range resources {
-		for _, dep := range r.DependsOn {
-			if _, ok := resMap[dep]; !ok {
-				return nil, fmt.Errorf("kaynak bulunamadı: %s (bağımlılık hatası: %s)", dep, r.Name)
-			}
-		}
+	return resources, nil
+}
+
+// Bu yardımcı fonksiyon, ileride bağımlılık analizi yapıldığında kullanılabilir.
+// Şu an ResourceConfig içinde "DependsOn" alanı olmadığı için pasif.
+func validateDependencies(res ResourceConfig, allResources map[string]ResourceConfig) error {
+	// Örn: if res.DependsOn != "" && allResources[res.DependsOn] == nil { error }
+	return nil
+}
+
+// Flatten, katmanlı yapıyı düz listeye çevirir (İhtiyaç olursa)
+func Flatten(layers [][]ResourceConfig) []ResourceConfig {
+	var flat []ResourceConfig
+	for _, layer := range layers {
+		flat = append(flat, layer...)
 	}
-
-	var levels [][]Resource
-	for len(inDegree) > 0 {
-		var currentLevel []Resource
-		var currentLevelNames []string
-
-		// Bağımlılığı kalmayan (derecesi 0 olan) kaynakları bu seviyeye ekle
-		for name, degree := range inDegree {
-			if degree == 0 {
-				currentLevel = append(currentLevel, resMap[name])
-				currentLevelNames = append(currentLevelNames, name)
-			}
-		}
-
-		// Eğer derecesi 0 olan kaynak kalmadıysa ama hala bekleyen kaynak varsa döngü vardır
-		if len(currentLevel) == 0 {
-			return nil, fmt.Errorf("döngüsel bağımlılık tespit edildi")
-		}
-
-		// İşlenenleri grafikten çıkar ve onlara bağlı olanların derecesini azalt
-		for _, name := range currentLevelNames {
-			delete(inDegree, name)
-			for _, neighbor := range adj[name] {
-				inDegree[neighbor]--
-			}
-		}
-		levels = append(levels, currentLevel)
-	}
-
-	return levels, nil
+	return flat
 }

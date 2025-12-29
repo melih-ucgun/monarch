@@ -1,6 +1,7 @@
 package resources
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -8,54 +9,68 @@ import (
 )
 
 type GitResource struct {
-	CanonicalID string
-	URL         string
-	Path        string
+	RepoURL string
+	Dest    string
+	Branch  string
 }
 
 func (g *GitResource) ID() string {
-	return g.CanonicalID
+	return fmt.Sprintf("git:%s", g.Dest)
 }
 
 func (g *GitResource) Check() (bool, error) {
-	info, err := os.Stat(g.Path)
+	info, err := os.Stat(g.Dest)
 	if os.IsNotExist(err) {
 		return false, nil
 	}
-	if err != nil {
-		return false, err
-	}
-
 	if !info.IsDir() {
-		return false, fmt.Errorf("%s bir dizin değil", g.Path)
+		return false, fmt.Errorf("%s bir dizin değil", g.Dest)
 	}
 
-	gitDir := filepath.Join(g.Path, ".git")
+	// Daha güçlü kontrol: İçeride .git var mı?
+	gitDir := filepath.Join(g.Dest, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		// Dizin var ama git reposu değil.
+		// Bu durumda Apply çalışmalı ama "git clone" hata verebilir (dizin boş değilse).
+		// Eğer dizin boşsa sorun yok. Doluysa çakışma var demektir.
+
+		// Şimdilik basitçe: "Git reposu değilse false dön" diyoruz.
 		return false, nil
 	}
 
 	return true, nil
 }
 
-// Diff, Git reposunun durumunu raporlar.
+func (g *GitResource) Apply() error {
+	cmd := exec.Command("git", "clone", g.RepoURL, g.Dest)
+	if g.Branch != "" {
+		cmd.Args = append(cmd.Args, "-b", g.Branch)
+	}
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git clone hatası: %s", string(out))
+	}
+	return nil
+}
+
 func (g *GitResource) Diff() (string, error) {
 	exists, _ := g.Check()
 	if !exists {
-		return fmt.Sprintf("+ git clone %s -> %s", g.URL, g.Path), nil
+		return fmt.Sprintf("+ git clone: %s -> %s", g.RepoURL, g.Dest), nil
 	}
-	return fmt.Sprintf("~ git pull %s", g.Path), nil
+	return "", nil
 }
 
-func (g *GitResource) Apply() error {
-	if _, err := os.Stat(g.Path); os.IsNotExist(err) {
-		parentDir := filepath.Dir(g.Path)
-		os.MkdirAll(parentDir, 0755)
-
-		cmd := exec.Command("git", "clone", g.URL, g.Path)
-		return cmd.Run()
+func (g *GitResource) Undo(ctx context.Context) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
 	}
-
-	cmd := exec.Command("git", "-C", g.Path, "pull")
-	return cmd.Run()
+	if g.Dest == "/" || g.Dest == "" {
+		return fmt.Errorf("tehlikeli silme işlemi engellendi: %s", g.Dest)
+	}
+	// Güvenlik için sadece .git klasörü varsa silmeye izin verilebilir
+	// Şimdilik manuel bırakıyoruz veya kullanıcıya bırakıyoruz.
+	// return os.RemoveAll(g.Dest)
+	return nil
 }

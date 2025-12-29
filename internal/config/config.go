@@ -1,75 +1,45 @@
 package config
 
 import (
-	"io"
+	"fmt"
 	"os"
 
 	"gopkg.in/yaml.v3"
 )
 
-type Config struct {
-	Vars      map[string]interface{} `yaml:"vars"`
-	Hosts     []Host                 `yaml:"hosts"`
-	Resources []Resource             `yaml:"resources"`
+// ResourceConfig, YAML'dan okunan ham kaynak tanımıdır.
+// Factory bu yapıyı kullanarak gerçek Resource nesnelerini üretir.
+type ResourceConfig struct {
+	ID         string                 `yaml:"id"`
+	Type       string                 `yaml:"type"`
+	Parameters map[string]interface{} `yaml:"params"`
 }
 
 type Host struct {
 	Name           string `yaml:"name"`
-	Address        string `yaml:"address"`
-	Port           int    `yaml:"port"`
+	HostName       string `yaml:"hostname"`
 	User           string `yaml:"user"`
-	Password       string `yaml:"password"`
-	BecomePassword string `yaml:"become_password"`
+	Port           int    `yaml:"port"`
+	SSHKeyPath     string `yaml:"ssh_key_path"`
+	BecomePassword string `yaml:"become_password"` // Sudo şifresi (Age ile şifrelenecek)
 }
 
-type Resource struct {
-	Name      string            `yaml:"name"`
-	Type      string            `yaml:"type"`
-	Path      string            `yaml:"path"`
-	Content   string            `yaml:"content"`
-	Source    string            `yaml:"source"`
-	Target    string            `yaml:"target"`
-	Mode      string            `yaml:"mode"`
-	Owner     string            `yaml:"owner"`
-	Group     string            `yaml:"group"`
-	State     string            `yaml:"state"` // present, absent, started, stopped
-	Enabled   bool              `yaml:"enabled"`
-	Image     string            `yaml:"image"`
-	Ports     []string          `yaml:"ports"`
-	Env       map[string]string `yaml:"env"`
-	Volumes   []string          `yaml:"volumes"`
-	Command   string            `yaml:"command"`
-	Creates   string            `yaml:"creates"`
-	OnlyIf    string            `yaml:"only_if"`
-	Unless    string            `yaml:"unless"`
-	URL       string            `yaml:"url"`
-	DependsOn []string          `yaml:"depends_on"`
+type Config struct {
+	Vars      map[string]string  `yaml:"vars"`
+	Hosts     []Host             `yaml:"hosts"`
+	Resources [][]ResourceConfig `yaml:"resources"` // Katmanlı yapı
 }
 
 func LoadConfig(path string) (*Config, error) {
-	var data []byte
-	var err error
-
-	// Eğer path "-" ise stdin'den oku, yoksa dosyadan oku
-	if path == "-" {
-		data, err = io.ReadAll(os.Stdin)
-	} else {
-		data, err = os.ReadFile(path)
-	}
-
+	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("config dosyası okunamadı: %w", err)
 	}
 
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("yaml parse hatası: %w", err)
 	}
 
 	return &cfg, nil
-}
-
-// Identify, kaynağı tekilleştirmek için bir ID üretir.
-func (r *Resource) Identify() string {
-	return r.Type + ":" + r.Name
 }

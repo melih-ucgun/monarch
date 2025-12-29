@@ -5,55 +5,65 @@ import (
 	"os/exec"
 )
 
-// ArchLinuxProvider; pacman, yay ve paru gibi araçları tek bir yapıdan yöneten adaptördür.
-type ArchLinuxProvider struct {
-	Binary  string // Kullanılacak komut (pacman, yay, paru)
-	UseSudo bool   // Komutun sudo ile çalıştırılıp çalıştırılmayacağı
-}
+type ArchLinuxProvider struct{}
 
-func (p *ArchLinuxProvider) IsInstalled(name string) (bool, error) {
-	// -Q flag'i paketin kurulu olup olmadığını hızlıca kontrol eder.
-	err := exec.Command(p.Binary, "-Q", name).Run()
-	return err == nil, nil
-}
-
-func (p *ArchLinuxProvider) Install(name string) error {
-	args := []string{"-S", "--noconfirm", name}
-	cmdName := p.Binary
-
-	if p.UseSudo {
-		args = append([]string{p.Binary}, args...)
-		cmdName = "sudo"
-	}
-
-	return exec.Command(cmdName, args...).Run()
-}
-
-func (p *ArchLinuxProvider) Remove(name string) error {
-	args := []string{"-R", "--noconfirm", name}
-	cmdName := p.Binary
-
-	if p.UseSudo {
-		args = append([]string{p.Binary}, args...)
-		cmdName = "sudo"
-	}
-
-	return exec.Command(cmdName, args...).Run()
-}
-
-// GetDefaultProvider, sistemdeki paket yöneticisini tespit eder ve uygun provider'ı döner.
-func GetDefaultProvider() PackageManager {
-	// Öncelik: AUR Helperlar -> Native Pacman
+// detectHelper: Sistemdeki AUR yardımcısını (paru veya yay) bulur.
+// Öncelik Paru'dadır. Hiçbiri yoksa boş string döner.
+func (a *ArchLinuxProvider) detectHelper() string {
 	if _, err := exec.LookPath("paru"); err == nil {
-		return &ArchLinuxProvider{Binary: "paru", UseSudo: false}
+		return "paru"
 	}
 	if _, err := exec.LookPath("yay"); err == nil {
-		return &ArchLinuxProvider{Binary: "yay", UseSudo: false}
+		return "yay"
 	}
-	if _, err := exec.LookPath("pacman"); err == nil {
-		return &ArchLinuxProvider{Binary: "pacman", UseSudo: true}
+	return ""
+}
+
+func (a *ArchLinuxProvider) Install(name string) error {
+	helper := a.detectHelper()
+
+	var cmd *exec.Cmd
+	if helper != "" {
+		fmt.Printf("📦 Paket kuruluyor (%s): %s\n", helper, name)
+		// AUR yardımcıları (paru/yay) genellikle sudo ile çalıştırılmaz,
+		// root yetkisini kendileri isterler.
+		cmd = exec.Command(helper, "-S", "--noconfirm", "--needed", name)
+	} else {
+		fmt.Printf("📦 Paket kuruluyor (Pacman): %s\n", name)
+		// Pacman sudo gerektirir
+		cmd = exec.Command("sudo", "pacman", "-S", "--noconfirm", "--needed", name)
 	}
 
-	fmt.Println("❌ Uyarı: Sistemde desteklenen bir Arch paket yöneticisi bulunamadı.")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s install hatası: %s", helper, string(out))
+	}
 	return nil
+}
+
+func (a *ArchLinuxProvider) Remove(name string) error {
+	helper := a.detectHelper()
+
+	var cmd *exec.Cmd
+	if helper != "" {
+		fmt.Printf("🗑️ Paket siliniyor (%s): %s\n", helper, name)
+		cmd = exec.Command(helper, "-Rns", "--noconfirm", name)
+	} else {
+		fmt.Printf("🗑️ Paket siliniyor (Pacman): %s\n", name)
+		cmd = exec.Command("sudo", "pacman", "-Rns", "--noconfirm", name)
+	}
+
+	// Hata olsa bile (paket yoksa) devam etsin
+	_ = cmd.Run()
+	return nil
+}
+
+func (a *ArchLinuxProvider) Check(name string) (bool, error) {
+	// Kontrol için her zaman pacman -Qi yeterlidir,
+	// çünkü AUR paketleri de pacman veritabanına kaydolur.
+	cmd := exec.Command("pacman", "-Qi", name)
+	if err := cmd.Run(); err != nil {
+		return false, nil // Paket yok
+	}
+	return true, nil // Paket var
 }

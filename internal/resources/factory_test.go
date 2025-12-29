@@ -6,70 +6,42 @@ import (
 	"github.com/melih-ucgun/monarch/internal/config"
 )
 
-func TestNewResourceFactory(t *testing.T) {
-	vars := map[string]interface{}{"user": "melih"}
-
-	tests := []struct {
-		name    string
-		resCfg  config.Resource
-		wantErr bool
-	}{
-		{
-			name: "Dosya Kaynağı Oluşturma",
-			resCfg: config.Resource{
-				Type:    "file",
-				Name:    "test-file",
-				Path:    "/tmp/test",
-				Content: "hello {{ .user }}",
-			},
-			wantErr: false,
-		},
-		{
-			name: "Paket Kaynağı Oluşturma",
-			resCfg: config.Resource{
-				Type:  "package",
-				Name:  "neovim",
-				State: "installed",
-			},
-			wantErr: false,
-		},
-		{
-			name: "Bilinmeyen Kaynak Tipi",
-			resCfg: config.Resource{
-				Type: "unknown_type",
-				Name: "fail",
-			},
-			wantErr: true,
-		},
-		{
-			name: "Hatalı Şablon İçeriği",
-			resCfg: config.Resource{
-				Type:    "file",
-				Name:    "bad-template",
-				Content: "{{ .user",
-			},
-			wantErr: true,
+func TestNewFileResource(t *testing.T) {
+	cfg := config.ResourceConfig{
+		ID:   "file:test",
+		Type: "file",
+		Parameters: map[string]interface{}{
+			"path":    "/tmp/test",
+			"content": "hello",
+			"mode":    "0644",
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			res, err := New(tt.resCfg, vars)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && res == nil {
-				t.Error("New() kaynak oluşturamadı (nil döndü)")
-			}
+	res, err := New(cfg, nil)
+	if err != nil {
+		t.Fatalf("Factory hata döndü: %v", err)
+	}
 
-			// Tip kontrolü (File için içerik işlenmiş mi?)
-			if !tt.wantErr && tt.resCfg.Type == "file" {
-				fr := res.(*FileResource)
-				if fr.Content != "hello melih" {
-					t.Errorf("Şablon doğru işlenmedi. Got: %s", fr.Content)
-				}
-			}
-		})
+	fileRes, ok := res.(*FileResource)
+	if !ok {
+		t.Fatalf("Dönen tip FileResource değil")
+	}
+
+	if fileRes.Path != "/tmp/test" {
+		t.Errorf("Path hatalı: %s", fileRes.Path)
+	}
+
+	// Interface uyumluluk testi
+	var _ Resource = fileRes
+}
+
+func TestNewInvalidResource(t *testing.T) {
+	cfg := config.ResourceConfig{
+		Type: "unknown_type",
+	}
+
+	_, err := New(cfg, nil)
+	if err == nil {
+		t.Error("Bilinmeyen tip için hata dönmeliydi")
 	}
 }

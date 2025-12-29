@@ -1,60 +1,45 @@
 package config
 
 import (
+	"reflect"
 	"testing"
 )
 
 func TestSortResources(t *testing.T) {
-	tests := []struct {
-		name      string
-		resources []Resource
-		wantErr   bool
-		wantLevel int
-	}{
+	// Basit bir senaryo: Sıralama değişmeden dönmeli (şimdilik)
+	input := [][]ResourceConfig{
 		{
-			name: "Basit Doğrusal Bağımlılık",
-			resources: []Resource{
-				{Name: "app", DependsOn: []string{"pkg"}},
-				{Name: "pkg", DependsOn: []string{}},
-			},
-			wantErr:   false,
-			wantLevel: 2,
+			{ID: "res1", Type: "file"},
 		},
 		{
-			name: "Karmaşık Paralel Bağımlılık",
-			resources: []Resource{
-				{Name: "service", DependsOn: []string{"config"}},
-				{Name: "config", DependsOn: []string{"pkg"}},
-				{Name: "pkg", DependsOn: []string{}},
-				{Name: "unrelated", DependsOn: []string{}},
-			},
-			wantErr:   false,
-			wantLevel: 3,
-		},
-		{
-			name: "Döngüsel Bağımlılık Hatası",
-			resources: []Resource{
-				{Name: "A", DependsOn: []string{"B"}},
-				{Name: "B", DependsOn: []string{"A"}},
-			},
-			wantErr: true,
+			{ID: "res2", Type: "service"},
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := SortResources(tt.resources)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("SortResources() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if tt.wantErr {
-				return
-			}
+	expected := input
 
-			if len(got) != tt.wantLevel {
-				t.Errorf("%s: Katman sayısı hatalı. Got %d, Want %d", tt.name, len(got), tt.wantLevel)
-			}
-		})
+	result, err := SortResources(input)
+	if err != nil {
+		t.Fatalf("SortResources hata döndü: %v", err)
+	}
+
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("Beklenen: %v, Alınan: %v", expected, result)
+	}
+}
+
+func TestFlatten(t *testing.T) {
+	input := [][]ResourceConfig{
+		{{ID: "1"}, {ID: "2"}},
+		{{ID: "3"}},
+	}
+	expectedLen := 3
+
+	flat := Flatten(input)
+	if len(flat) != expectedLen {
+		t.Errorf("Beklenen uzunluk %d, alınan %d", expectedLen, len(flat))
+	}
+	if flat[2].ID != "3" {
+		t.Errorf("Flatten sıralaması hatalı")
 	}
 }
