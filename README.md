@@ -131,5 +131,7 @@ Monarch is constantly evolving. Here is our plan:
     
 - [ ] **Autonomous:** Self-healing system and fleet management.
     
+## Licence
+This project is licensed under the [GNU Affero General Public License v3.0](LICENSE).
 
 **Monarch** © 2025 Developed by Melih Uçgun
