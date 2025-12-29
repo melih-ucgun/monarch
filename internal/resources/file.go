@@ -94,25 +94,73 @@ func (f *FileResource) Diff() (string, error) {
 	return fmt.Sprintf("! %s:\n%s", f.Path, diffMsg), nil
 }
 
+// Apply artık ATOMİK çalışır.
+// Dosyayı önce geçici bir isme yazar, sonra rename yapar.
 func (f *FileResource) Apply() error {
 	dir := filepath.Dir(f.Path)
-	os.MkdirAll(dir, 0o755)
-
-	err := os.WriteFile(f.Path, []byte(f.Content), 0o644)
-	if err != nil {
-		return err
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("hedef dizin oluşturulamadı: %w", err)
 	}
 
+	// 1. Geçici dosya oluştur (Aynı dizinde olmalı ki rename işlemi atomik olsun)
+	tmpFile, err := os.CreateTemp(dir, ".monarch-tmp-*")
+	if err != nil {
+		return fmt.Errorf("geçici dosya oluşturulamadı: %w", err)
+	}
+	tmpName := tmpFile.Name()
+
+	// İşlem başarısız olursa geçici dosyayı temizle
+	success := false
+	defer func() {
+		tmpFile.Close() // Dosyayı kapatmayı garantiye al
+		if !success {
+			os.Remove(tmpName) // Başarısızsa sil
+		}
+	}()
+
+	// 2. İçeriği yaz
+	if _, err := tmpFile.Write([]byte(f.Content)); err != nil {
+		return fmt.Errorf("dosya içeriği yazılamadı: %w", err)
+	}
+
+	// 3. Diske senkronize et (Veri bütünlüğü için kritik)
+	// Bu işlem verinin işletim sistemi tamponundan diske fiziksel olarak yazılmasını zorlar.
+	if err := tmpFile.Sync(); err != nil {
+		return fmt.Errorf("disk senkronizasyonu hatası: %w", err)
+	}
+
+	// 4. Dosyayı kapat (Rename etmeden önce kapatmak şarttır)
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("dosya kapatılamadı: %w", err)
+	}
+
+	// 5. İzinleri ve Sahipliği ayarla (Rename öncesi yapılmalı)
+	// Böylece dosya görünür olduğunda zaten doğru izinlere sahip olur.
 	if f.Mode != "" {
 		m, _ := strconv.ParseUint(f.Mode, 8, 32)
-		os.Chmod(f.Path, os.FileMode(m))
+		if err := os.Chmod(tmpName, os.FileMode(m)); err != nil {
+			return fmt.Errorf("izinler ayarlanamadı: %w", err)
+		}
+	} else {
+		// Varsayılan izin (orijinal kodda olduğu gibi)
+		os.Chmod(tmpName, 0o644)
 	}
 
 	if f.Owner != "" || f.Group != "" {
 		uid, _ := resolveUser(f.Owner)
 		gid, _ := resolveGroup(f.Group)
-		os.Chown(f.Path, uid, gid)
+		if err := os.Chown(tmpName, uid, gid); err != nil {
+			return fmt.Errorf("sahiplik ayarlanamadı: %w", err)
+		}
 	}
+
+	// 6. Atomik Taşıma (Atomic Rename)
+	// Eski dosya varsa güvenli bir şekilde ezilir.
+	if err := os.Rename(tmpName, f.Path); err != nil {
+		return fmt.Errorf("atomik taşıma başarısız: %w", err)
+	}
+
+	success = true
 	return nil
 }
 
