@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/melih-ucgun/monarch/internal/config"
 	"github.com/melih-ucgun/monarch/internal/engine"
 	"github.com/spf13/cobra"
@@ -13,62 +15,72 @@ import (
 
 var watchCmd = &cobra.Command{
 	Use:   "watch",
-	Short: "Konfigürasyon dosyasını izler ve değişiklikte uygular",
+	Short: "Sürekli olarak konfigürasyonu uygular (Daemon modu)",
+	Long:  `Belirtilen aralıklarla sistem durumunu kontrol eder ve sapma varsa düzeltir.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		configFile, _ := rootCmd.PersistentFlags().GetString("config")
+		cfgFile, _ := cmd.Flags().GetString("config")
+		intervalStr, _ := cmd.Flags().GetString("interval")
+		host, _ := cmd.Flags().GetString("host")
 
-		watcher, err := fsnotify.NewWatcher()
+		interval, err := time.ParseDuration(intervalStr)
 		if err != nil {
-			slog.Error("Watcher başlatılamadı", "error", err)
+			fmt.Printf("Geçersiz zaman aralığı: %v\n", err)
 			os.Exit(1)
 		}
-		defer watcher.Close()
 
-		go func() {
-			for {
-				select {
-				case event, ok := <-watcher.Events:
-					if !ok {
-						return
-					}
-					if event.Has(fsnotify.Write) {
-						// engine.LogTimestamp() yerine standart time paketini kullanıyoruz
-						slog.Info("Değişiklik algılandı", "file", event.Name, "at", time.Now().Format("15:04:05"))
+		// 1. Context ve Sinyal Yakalama
+		// Program Ctrl+C ile durdurulana kadar çalışacak bir context oluşturuyoruz.
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer cancel()
 
-						cfg, err := config.LoadConfig(configFile)
-						if err != nil {
-							slog.Error("Config yükleme hatası", "error", err)
-							continue
-						}
+		cfg, err := config.LoadConfig(cfgFile)
+		if err != nil {
+			fmt.Printf("Konfigürasyon hatası: %v\n", err)
+			os.Exit(1)
+		}
 
-						recon := engine.NewReconciler(cfg, engine.EngineOptions{
-							ConfigFile: configFile,
-						})
-						_, _ = recon.Run()
+		opts := engine.EngineOptions{
+			DryRun:     false,
+			HostName:   host,
+			ConfigFile: cfgFile,
+		}
+
+		recon := engine.NewReconciler(cfg, opts)
+		slog.Info("Monarch Watch Modu Başlatıldı", "interval", interval)
+
+		// 2. Ana Döngü
+		// İlk çalışmayı hemen yap
+		if _, err := recon.Run(ctx); err != nil {
+			slog.Error("İlk çalıştırma hatası", "error", err)
+		}
+
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				// Ctrl+C basıldı, güvenli çıkış yap
+				slog.Info("Watch modu sonlandırılıyor...")
+				return
+			case <-ticker.C:
+				// Zamanı gelince çalıştır
+				// Her seferinde context'in iptal edilip edilmediğini kontrol eden Run çağrısı
+				if _, err := recon.Run(ctx); err != nil {
+					// Context iptal edildiyse loop'u kırmaya gerek yok, select bloğu zaten halleder
+					// Ama diğer hataları logla
+					if err != context.Canceled {
+						slog.Error("Reconcile hatası", "error", err)
 					}
-				case err, ok := <-watcher.Errors:
-					if !ok {
-						return
-					}
-					slog.Error("Watcher hatası", "error", err)
 				}
 			}
-		}()
-
-		err = watcher.Add(configFile)
-		if err != nil {
-			slog.Error("Dosya izlenemiyor", "error", err)
-			os.Exit(1)
 		}
-
-		slog.Info("👀 Monarch izlemede...", "config", configFile)
-
-		// Programın kapanmaması için sonsuz döngü
-		done := make(chan bool)
-		<-done
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(watchCmd)
+	watchCmd.Flags().StringP("config", "c", "monarch.yaml", "Konfigürasyon dosyası")
+	watchCmd.Flags().StringP("interval", "i", "5m", "Kontrol aralığı (örn: 30s, 5m, 1h)")
+	watchCmd.Flags().String("host", "", "Uzak sunucu adı")
 }

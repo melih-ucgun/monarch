@@ -4,7 +4,6 @@ go 1.25.5
 
 require (
 	filippo.io/age v1.3.1
-	github.com/fsnotify/fsnotify v1.9.0
 	github.com/pkg/sftp v1.13.10
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/crypto v0.46.0
