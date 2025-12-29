@@ -135,8 +135,6 @@ func NewSSHTransport(ctx context.Context, host config.Host) (*SSHTransport, erro
 	if socket := os.Getenv("SSH_AUTH_SOCK"); socket != "" {
 		if conn, err := net.Dial("unix", socket); err == nil {
 			conn.Close()
-			// Not: Orijinal kodda agent signers eklenmiyordu, yapıyı bozmamak için
-			// burayı olduğu gibi bıraktım. Geliştirmek isterseniz agent.NewClient eklenmeli.
 		}
 	}
 
@@ -205,9 +203,6 @@ func askToTrustHost(path string, hostname string, key ssh.PublicKey) error {
 	// Standart known_hosts formatı: host key-type key-base64
 	keyType := key.Type()
 	keyBase64 := base64.StdEncoding.EncodeToString(key.Marshal())
-
-	// Eğer hostname standart dışı bir porta sahipse, knownhosts bazen [host]:port formatını bekler
-	// Basitlik için gelen hostname'i olduğu gibi yazıyoruz.
 	line := fmt.Sprintf("%s %s %s\n", hostname, keyType, keyBase64)
 
 	if _, err := f.WriteString(line); err != nil {
@@ -351,7 +346,8 @@ func (t *SSHTransport) DownloadFile(ctx context.Context, remotePath, localPath s
 	})
 }
 
-func (t *SSHTransport) RunRemoteSecure(ctx context.Context, cmd string, becomePass string) error {
+// RunRemoteSecure artık inputData (stdin'e yazılacak veri) parametresi alıyor.
+func (t *SSHTransport) RunRemoteSecure(ctx context.Context, cmd string, becomePass string, inputData string) error {
 	session, err := t.client.NewSession()
 	if err != nil {
 		return err
@@ -386,9 +382,18 @@ func (t *SSHTransport) RunRemoteSecure(ctx context.Context, cmd string, becomePa
 		return err
 	}
 
+	// Sudo şifresini gönder (gerekirse)
 	if t.config.User != "root" && becomePass != "" {
 		_, _ = stdin.Write([]byte(becomePass + "\n"))
 	}
+
+	// Konfigürasyon verisini veya diğer inputları gönder
+	if inputData != "" {
+		_, _ = stdin.Write([]byte(inputData))
+	}
+
+	// Stdin'i kapatarak EOF gönderiyoruz, böylece karşı taraf okumayı bitirebilir.
+	stdin.Close()
 
 	go io.Copy(os.Stdout, stdout)
 

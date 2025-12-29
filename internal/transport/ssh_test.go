@@ -136,7 +136,7 @@ func TestSSHTransport_RunRemoteSecure(t *testing.T) {
 	defer tr.Close()
 
 	// Test: Komut Çalıştırma
-	err = tr.RunRemoteSecure(ctx, "echo hello", "")
+	err = tr.RunRemoteSecure(ctx, "echo hello", "", "")
 	if err != nil {
 		t.Errorf("RunRemoteSecure hata verdi: %v", err)
 	}

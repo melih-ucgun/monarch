@@ -131,6 +131,12 @@ func (e *Reconciler) runRemote(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("host bulunamadı: %s", e.Opts.HostName)
 	}
 
+	// Yerel konfigürasyon dosyasını belleğe oku (Diske kopyalamamak için)
+	configContent, err := os.ReadFile(e.Opts.ConfigFile)
+	if err != nil {
+		return 0, fmt.Errorf("konfig dosyası okunamadı: %w", err)
+	}
+
 	// Transport'u Context ile başlatıyoruz
 	t, err := transport.NewSSHTransport(ctx, *target)
 	if err != nil {
@@ -151,30 +157,29 @@ func (e *Reconciler) runRemote(ctx context.Context) (int, error) {
 
 	timestamp := time.Now().Format("20060102150405")
 	remoteBinPath := fmt.Sprintf("/tmp/monarch-%s", timestamp)
-	remoteCfgPath := fmt.Sprintf("/tmp/monarch-%s.yaml", timestamp)
+
+	// Konfigürasyon dosyasını ARTIK KOPYALAMIYORUZ.
+	// if err := t.CopyFile(ctx, e.Opts.ConfigFile, remoteCfgPath); err != nil { ... }
 
 	if err := t.CopyFile(ctx, binaryPath, remoteBinPath); err != nil {
 		return 0, err
 	}
-	if err := t.CopyFile(ctx, e.Opts.ConfigFile, remoteCfgPath); err != nil {
-		return 0, err
-	}
 
-	runCmd := fmt.Sprintf("chmod +x %s && %s apply --config %s", remoteBinPath, remoteBinPath, remoteCfgPath)
+	// Komutta --config - diyerek konfigürasyonu stdin'den okumasını söylüyoruz
+	runCmd := fmt.Sprintf("chmod +x %s && %s apply --config -", remoteBinPath, remoteBinPath)
 	if e.Opts.DryRun {
 		runCmd += " --dry-run"
 	}
 
-	// Bu uzun süren işlem artık iptal edilebilir
-	err = t.RunRemoteSecure(ctx, runCmd, target.BecomePassword)
+	// Konfigürasyon içeriğini (configContent) string olarak son parametrede veriyoruz
+	err = t.RunRemoteSecure(ctx, runCmd, target.BecomePassword, string(configContent))
 
-	// Uzak işlemi temizle (Context iptal olsa bile temizliği denemeliyiz)
-	// Temizlik için yeni, kısa süreli bir context oluşturuyoruz (Graceful cleanup)
+	// Uzak işlemi temizle
 	cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// DÜZELTME: cleanupCtx burada kullanılıyor
-	_ = t.RunRemoteSecure(cleanupCtx, fmt.Sprintf("rm -f %s %s", remoteBinPath, remoteCfgPath), "")
+	// Sadece binary'i siliyoruz, config dosyası zaten yok
+	_ = t.RunRemoteSecure(cleanupCtx, fmt.Sprintf("rm -f %s", remoteBinPath), "", "")
 
 	if err != nil {
 		return 0, fmt.Errorf("uzak sunucu hatası: %w", err)

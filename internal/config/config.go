@@ -1,6 +1,7 @@
 package config
 
 import (
+	"io"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -46,7 +47,16 @@ type Resource struct {
 }
 
 func LoadConfig(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
+	var data []byte
+	var err error
+
+	// Eğer path "-" ise stdin'den oku, yoksa dosyadan oku
+	if path == "-" {
+		data, err = io.ReadAll(os.Stdin)
+	} else {
+		data, err = os.ReadFile(path)
+	}
+
 	if err != nil {
 		return nil, err
 	}
