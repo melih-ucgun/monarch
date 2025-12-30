@@ -5,72 +5,61 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 )
 
 type GitResource struct {
-	RepoURL string
-	Dest    string
-	Branch  string
+	CanonicalID string `mapstructure:"-"`
+	RepoURL     string `mapstructure:"repo"`
+	Dest        string `mapstructure:"dest"`
+	Branch      string `mapstructure:"branch"`
 }
 
-func (g *GitResource) ID() string {
-	return fmt.Sprintf("git:%s", g.Dest)
+func (r *GitResource) ID() string {
+	return r.CanonicalID
 }
 
-func (g *GitResource) Check() (bool, error) {
-	info, err := os.Stat(g.Dest)
-	if os.IsNotExist(err) {
+func (r *GitResource) Check() (bool, error) {
+	// Dizin var mı?
+	if _, err := os.Stat(r.Dest); os.IsNotExist(err) {
 		return false, nil
 	}
-	if !info.IsDir() {
-		return false, fmt.Errorf("%s bir dizin değil", g.Dest)
-	}
-
-	// Daha güçlü kontrol: İçeride .git var mı?
-	gitDir := filepath.Join(g.Dest, ".git")
+	// .git klasörü var mı? (Basit bir repo check)
+	gitDir := fmt.Sprintf("%s/.git", r.Dest)
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-		// Dizin var ama git reposu değil.
-		// Bu durumda Apply çalışmalı ama "git clone" hata verebilir (dizin boş değilse).
-		// Eğer dizin boşsa sorun yok. Doluysa çakışma var demektir.
-
-		// Şimdilik basitçe: "Git reposu değilse false dön" diyoruz.
 		return false, nil
 	}
 
+	// TODO: Branch check eklenebilir (git rev-parse --abbrev-ref HEAD)
 	return true, nil
 }
 
-func (g *GitResource) Apply() error {
-	cmd := exec.Command("git", "clone", g.RepoURL, g.Dest)
-	if g.Branch != "" {
-		cmd.Args = append(cmd.Args, "-b", g.Branch)
-	}
+func (r *GitResource) Apply() error {
+	if _, err := os.Stat(r.Dest); os.IsNotExist(err) {
+		// Dizin yok, Clone yap
+		args := []string{"clone", r.RepoURL, r.Dest}
+		if r.Branch != "" {
+			args = append(args, "--branch", r.Branch)
+		}
 
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git clone hatası: %s", string(out))
+		cmd := exec.Command("git", args...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git clone hatası: %s", string(out))
+		}
+	} else {
+		// Dizin var, Pull yap
+		// Not: Eğer uncommitted changes varsa fail olabilir, force pull gerekebilir.
+		cmd := exec.Command("git", "-C", r.Dest, "pull")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git pull hatası: %s", string(out))
+		}
 	}
 	return nil
 }
 
-func (g *GitResource) Diff() (string, error) {
-	exists, _ := g.Check()
-	if !exists {
-		return fmt.Sprintf("+ git clone: %s -> %s", g.RepoURL, g.Dest), nil
-	}
-	return "", nil
+func (r *GitResource) Undo(ctx context.Context) error {
+	return os.RemoveAll(r.Dest)
 }
 
-func (g *GitResource) Undo(ctx context.Context) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	if g.Dest == "/" || g.Dest == "" {
-		return fmt.Errorf("tehlikeli silme işlemi engellendi: %s", g.Dest)
-	}
-	// Güvenlik için sadece .git klasörü varsa silmeye izin verilebilir
-	// Şimdilik manuel bırakıyoruz veya kullanıcıya bırakıyoruz.
-	// return os.RemoveAll(g.Dest)
-	return nil
+func (r *GitResource) Diff() (string, error) {
+	return fmt.Sprintf("Git repo[%s] missing or outdated", r.Dest), nil
 }

@@ -5,74 +5,73 @@ import (
 	"fmt"
 )
 
-// PackageManager arayüzü: Farklı dağıtımlar için (Arch, Debian) ortak metodlar
-type PackageManager interface {
-	Install(name string) error
-	Remove(name string) error
-	Check(name string) (bool, error)
-}
-
 type PackageResource struct {
-	CanonicalID string
-	Name        string
-	ManagerName string // "pacman", "apt" vb.
-	State       string // "installed", "absent"
+	CanonicalID string `mapstructure:"-"`
+	Name        string `mapstructure:"name"`
+	ManagerName string `mapstructure:"manager"` // pacman, apt, brew vs.
+	State       string `mapstructure:"state"`   // installed, removed
 }
 
-func (p *PackageResource) ID() string {
-	if p.CanonicalID != "" {
-		return p.CanonicalID
-	}
-	return fmt.Sprintf("package:%s", p.Name)
+func (r *PackageResource) ID() string {
+	return r.CanonicalID
 }
 
-// getManager: Manager ismine göre uygun implementasyonu döner
-func (p *PackageResource) getManager() PackageManager {
-	switch p.ManagerName {
-	case "pacman":
-		return &ArchLinuxProvider{}
-	// İleride buraya case "apt": return &DebianProvider{} eklenecek
-	default:
-		return &ArchLinuxProvider{} // Varsayılan
-	}
-}
-
-func (p *PackageResource) Check() (bool, error) {
-	mgr := p.getManager()
-	exists, err := mgr.Check(p.Name)
+func (r *PackageResource) Check() (bool, error) {
+	// package_arch.go içerisindeki GetPackageManager'ı çağırır
+	mgr, err := GetPackageManager(r.ManagerName)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("paket yöneticisi hatası: %w", err)
 	}
 
-	if p.State == "absent" {
-		return !exists, nil
+	isInstalled, err := mgr.IsInstalled(r.Name)
+	if err != nil {
+		return false, fmt.Errorf("paket durumu sorgulanamadı (%s): %w", r.Name, err)
 	}
-	return exists, nil
+
+	switch r.State {
+	case "installed":
+		return isInstalled, nil
+	case "removed":
+		return !isInstalled, nil
+	default:
+		return false, fmt.Errorf("desteklenmeyen paket durumu: %s", r.State)
+	}
 }
 
-func (p *PackageResource) Apply() error {
-	mgr := p.getManager()
-	if p.State == "absent" {
-		return mgr.Remove(p.Name)
+func (r *PackageResource) Apply() error {
+	mgr, err := GetPackageManager(r.ManagerName)
+	if err != nil {
+		return err
 	}
-	return mgr.Install(p.Name)
+
+	switch r.State {
+	case "installed":
+		if err := mgr.Install(r.Name); err != nil {
+			return fmt.Errorf("paket yüklenemedi (%s): %w", r.Name, err)
+		}
+	case "removed":
+		if err := mgr.Remove(r.Name); err != nil {
+			return fmt.Errorf("paket kaldırılamadı (%s): %w", r.Name, err)
+		}
+	}
+	return nil
 }
 
-func (p *PackageResource) Diff() (string, error) {
-	exists, _ := p.getManager().Check(p.Name)
-	if !exists && p.State != "absent" {
-		return fmt.Sprintf("+ package: %s (Kurulacak)", p.Name), nil
+func (r *PackageResource) Undo(ctx context.Context) error {
+	mgr, err := GetPackageManager(r.ManagerName)
+	if err != nil {
+		return err
 	}
-	if exists && p.State == "absent" {
-		return fmt.Sprintf("- package: %s (Kaldırılacak)", p.Name), nil
+
+	// Basit undo mantığı: Yüklendiyse kaldır, kaldırıldıysa yükle
+	if r.State == "installed" {
+		return mgr.Remove(r.Name)
+	} else if r.State == "removed" {
+		return mgr.Install(r.Name)
 	}
-	return "", nil
+	return nil
 }
 
-func (p *PackageResource) Undo(ctx context.Context) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	// Undo mantığı: Eğer kurulduysa kaldır.
-	return p.getManager().Remove(p.Name)
+func (r *PackageResource) Diff() (string, error) {
+	return fmt.Sprintf("Package[%s] state mismatch: want %s", r.Name, r.State), nil
 }

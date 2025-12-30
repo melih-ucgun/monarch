@@ -4,71 +4,59 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strings"
 )
 
 type ExecResource struct {
-	CanonicalID string
-	Command     string
-	Unless      string
-	OnlyIf      string
-	Creates     string
-	RunAsUser   string
+	CanonicalID string `mapstructure:"-"`
+	Command     string `mapstructure:"command"`
+	Unless      string `mapstructure:"unless"` // Eğer bu komut 0 dönerse, asıl komutu çalıştırma
+	RunAsUser   string `mapstructure:"run_as"` // TODO: User switch logic (su/sudo) eklenebilir
 }
 
-func (e *ExecResource) ID() string {
-	if e.CanonicalID != "" {
-		return e.CanonicalID
-	}
-	return fmt.Sprintf("exec:%s", e.Command)
+func (r *ExecResource) ID() string {
+	return r.CanonicalID
 }
 
-func (e *ExecResource) Check() (bool, error) {
-	// Unless ve OnlyIf kontrolleri de RunAsUser bağlamında çalışmalı mı?
-	// Genellikle evet. Ancak basitlik adına şimdilik root olarak kontrol ediyoruz.
-	// İhtiyaç olursa burası da sudo -u ile sarmalanabilir.
+func (r *ExecResource) Check() (bool, error) {
+	// Eğer 'Unless' komutu tanımlıysa, önce onu çalıştır.
+	// Unless komutu BAŞARILI (exit 0) dönerse, asıl komutun çalışmasına gerek yok demektir -> return true
+	if r.Unless != "" {
+		cmd := exec.Command("sh", "-c", r.Unless)
+		if err := cmd.Run(); err == nil {
+			return true, nil
+		}
+	}
 
-	if e.Unless != "" {
-		if err := exec.Command("sh", "-c", e.Unless).Run(); err == nil {
-			return true, nil // Unless başarılıysa (exit 0), işlem yapma
-		}
-	}
-	if e.OnlyIf != "" {
-		if err := exec.Command("sh", "-c", e.OnlyIf).Run(); err != nil {
-			return true, nil // OnlyIf başarısızsa, işlem yapma
-		}
-	}
-	// Exec kaynağı "durum" tutmaz, her çalıştırıldığında (unless yoksa) false döner.
+	// Eğer Unless yoksa veya başarısız olduysa, Command her zaman çalışmalıdır.
+	// Ancak idempotent olmayan komutlar için Check() her zaman false döner (her run'da çalışır).
+	// Eğer bir durum kontrolü isteniyorsa 'Unless' kullanılmalıdır.
 	return false, nil
 }
 
-func (e *ExecResource) Apply() error {
-	var cmd *exec.Cmd
-
-	if e.RunAsUser != "" {
-		fmt.Printf("🚀 Çalıştırılıyor (%s): %s\n", e.RunAsUser, e.Command)
-		// Kullanıcı adına geçiş yaparak çalıştır
-		cmd = exec.Command("sudo", "-u", e.RunAsUser, "sh", "-c", e.Command)
-	} else {
-		fmt.Printf("🚀 Çalıştırılıyor: %s\n", e.Command)
-		cmd = exec.Command("sh", "-c", e.Command)
+func (r *ExecResource) Apply() error {
+	trimmedCmd := strings.TrimSpace(r.Command)
+	if trimmedCmd == "" {
+		return nil
 	}
 
-	out, err := cmd.CombinedOutput()
+	// Shell üzerinden çalıştır ki pipe/redirect gibi özellikler kullanılabilsin
+	cmd := exec.Command("sh", "-c", r.Command)
+
+	// Çıktıyı yakala ki hata durumunda loglayabilelim
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("exec hatası: %s\nÇıktı: %s", err, string(out))
+		return fmt.Errorf("komut hatası: %s, output: \n%s", err, string(output))
 	}
 	return nil
 }
 
-func (e *ExecResource) Diff() (string, error) {
-	userMsg := ""
-	if e.RunAsUser != "" {
-		userMsg = fmt.Sprintf(" (User: %s)", e.RunAsUser)
-	}
-	return fmt.Sprintf("! exec: %s%s", e.Command, userMsg), nil
+func (r *ExecResource) Undo(ctx context.Context) error {
+	// Shell komutlarının otomatik geri alınması imkansızdır.
+	// İleride 'undo_command' parametresi eklenebilir.
+	return nil
 }
 
-func (e *ExecResource) Undo(ctx context.Context) error {
-	// Exec için genel bir undo yoktur.
-	return nil
+func (r *ExecResource) Diff() (string, error) {
+	return fmt.Sprintf("Command needs to run: %s", r.Command), nil
 }

@@ -8,54 +8,46 @@ import (
 )
 
 type ServiceResource struct {
-	CanonicalID string
-	Name        string
-	State       string // "started", "stopped", "restarted"
-	Enabled     bool   // systemctl enable
+	CanonicalID string `mapstructure:"-"`
+	Name        string `mapstructure:"name"`
+	State       string `mapstructure:"state"`   // started, stopped, restarted
+	Enabled     bool   `mapstructure:"enabled"` // enable on boot
 }
 
-func (s *ServiceResource) ID() string {
-	if s.CanonicalID != "" {
-		return s.CanonicalID
-	}
-	return fmt.Sprintf("service:%s", s.Name)
+func (r *ServiceResource) ID() string {
+	return r.CanonicalID
 }
 
-func (s *ServiceResource) Check() (bool, error) {
-	// 1. Aktiflik Kontrolü
-	cmdActive := exec.Command("systemctl", "is-active", s.Name)
+func (r *ServiceResource) Check() (bool, error) {
+	// 1. Active Durumu Kontrolü
+	// systemctl is-active -> active (exit 0), inactive (exit 3)
+	cmdActive := exec.Command("systemctl", "is-active", r.Name)
 	errActive := cmdActive.Run()
-	isActive := (errActive == nil)
 
-	shouldBeActive := (s.State == "started" || s.State == "restarted")
+	isActive := (errActive == nil)
+	shouldBeActive := (r.State == "started" || r.State == "restarted")
 
 	if isActive != shouldBeActive {
 		return false, nil
 	}
 
-	// 2. Enable Kontrolü
-	cmdEnabled := exec.Command("systemctl", "is-enabled", s.Name)
-	output, _ := cmdEnabled.Output()
-	isEnabled := strings.TrimSpace(string(output)) == "enabled"
+	// 2. Enabled Durumu Kontrolü
+	// systemctl is-enabled -> enabled (exit 0), disabled (exit 1)
+	cmdEnabled := exec.Command("systemctl", "is-enabled", r.Name)
+	outEnabled, _ := cmdEnabled.CombinedOutput()
+	isEnabled := (strings.TrimSpace(string(outEnabled)) == "enabled")
 
-	if isEnabled != s.Enabled {
+	if isEnabled != r.Enabled {
 		return false, nil
 	}
 
 	return true, nil
 }
 
-func (s *ServiceResource) Apply() error {
-	// Enable/Disable
-	if s.Enabled {
-		exec.Command("sudo", "systemctl", "enable", s.Name).Run()
-	} else {
-		exec.Command("sudo", "systemctl", "disable", s.Name).Run()
-	}
-
-	// State
-	action := ""
-	switch s.State {
+func (r *ServiceResource) Apply() error {
+	// State değişikliği
+	var action string
+	switch r.State {
 	case "started":
 		action = "start"
 	case "stopped":
@@ -65,22 +57,31 @@ func (s *ServiceResource) Apply() error {
 	}
 
 	if action != "" {
-		out, err := exec.Command("sudo", "systemctl", action, s.Name).CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("servis işlemi (%s) hatası: %s", action, string(out))
+		if out, err := exec.Command("systemctl", action, r.Name).CombinedOutput(); err != nil {
+			return fmt.Errorf("systemctl %s hatası: %s", action, string(out))
 		}
 	}
+
+	// Enable/Disable değişikliği
+	enableAction := "disable"
+	if r.Enabled {
+		enableAction = "enable"
+	}
+
+	// --now flag'i hem enable edip hem başlatabilir ama biz state'i ayrı yönettik
+	if out, err := exec.Command("systemctl", enableAction, r.Name).CombinedOutput(); err != nil {
+		return fmt.Errorf("systemctl %s hatası: %s", enableAction, string(out))
+	}
+
 	return nil
 }
 
-func (s *ServiceResource) Diff() (string, error) {
-	return fmt.Sprintf("~ service: %s -> %s, Enabled: %v", s.Name, s.State, s.Enabled), nil
+func (r *ServiceResource) Undo(ctx context.Context) error {
+	// Undo için basitçe durduruyoruz
+	exec.Command("systemctl", "stop", r.Name).Run()
+	return nil
 }
 
-func (s *ServiceResource) Undo(ctx context.Context) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	// Undo: Servisi durdur ve disable et
-	return exec.Command("sudo", "systemctl", "disable", "--now", s.Name).Run()
+func (r *ServiceResource) Diff() (string, error) {
+	return fmt.Sprintf("Service[%s] state/enabled mismatch", r.Name), nil
 }

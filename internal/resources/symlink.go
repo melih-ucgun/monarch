@@ -4,20 +4,22 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 type SymlinkResource struct {
-	Target string // Hedef dosya (gerçek dosya)
-	Link   string // Linkin oluşturulacağı yer
-	Force  bool
+	CanonicalID string `mapstructure:"-"`
+	Target      string `mapstructure:"target"` // Gerçek dosya
+	Link        string `mapstructure:"link"`   // Oluşturulacak link
+	Force       bool   `mapstructure:"force"`
 }
 
-func (s *SymlinkResource) ID() string {
-	return fmt.Sprintf("symlink:%s", s.Link)
+func (r *SymlinkResource) ID() string {
+	return r.CanonicalID
 }
 
-func (s *SymlinkResource) Check() (bool, error) {
-	info, err := os.Lstat(s.Link)
+func (r *SymlinkResource) Check() (bool, error) {
+	info, err := os.Lstat(r.Link)
 	if os.IsNotExist(err) {
 		return false, nil
 	}
@@ -25,48 +27,55 @@ func (s *SymlinkResource) Check() (bool, error) {
 		return false, err
 	}
 
+	// Link mi?
 	if info.Mode()&os.ModeSymlink == 0 {
-		return false, fmt.Errorf("%s mevcut fakat bir symlink değil", s.Link)
+		return false, nil // Var ama link değil
 	}
 
-	dest, err := os.Readlink(s.Link)
+	// Hedef doğru mu?
+	dest, err := os.Readlink(r.Link)
 	if err != nil {
 		return false, err
 	}
 
-	if dest != s.Target {
-		return false, nil
-	}
-
-	return true, nil
+	return dest == r.Target, nil
 }
 
-func (s *SymlinkResource) Apply() error {
-	if s.Force {
-		_ = os.Remove(s.Link)
+func (r *SymlinkResource) Apply() error {
+	// Hedef dizini oluştur
+	dir := filepath.Dir(r.Link)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("parent dizin oluşturulamadı: %w", err)
 	}
 
-	if err := os.Symlink(s.Target, s.Link); err != nil {
+	// Eğer dosya/link varsa ve force ise veya yanlışsa sil
+	if _, err := os.Lstat(r.Link); err == nil {
+		if r.Force {
+			if err := os.Remove(r.Link); err != nil {
+				return fmt.Errorf("eski link silinemedi: %w", err)
+			}
+		} else {
+			// Force değilse ve çakışma varsa hata dönmek daha güvenli olabilir
+			// ama idempotent olması için burada kontrol edip sadece yanlışsa silebiliriz.
+			// Şimdilik force yoksa dokunmuyoruz (Check zaten false dönerse Apply çalışır)
+			// Apply çağrıldıysa ve dosya varsa, demek ki Check false döndü.
+			// Yani dosya yanlış. Silip tekrar yapmalıyız.
+			if err := os.Remove(r.Link); err != nil {
+				return fmt.Errorf("mevcut dosya silinemedi (override): %w", err)
+			}
+		}
+	}
+
+	if err := os.Symlink(r.Target, r.Link); err != nil {
 		return fmt.Errorf("symlink oluşturulamadı: %w", err)
 	}
 	return nil
 }
 
-func (s *SymlinkResource) Diff() (string, error) {
-	exists, err := s.Check()
-	if err != nil {
-		return "", err
-	}
-	if !exists {
-		return fmt.Sprintf("+ symlink: %s -> %s", s.Link, s.Target), nil
-	}
-	return "", nil
+func (r *SymlinkResource) Undo(ctx context.Context) error {
+	return os.Remove(r.Link)
 }
 
-func (s *SymlinkResource) Undo(ctx context.Context) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	// return os.Remove(s.Link)
-	return nil
+func (r *SymlinkResource) Diff() (string, error) {
+	return fmt.Sprintf("Symlink[%s -> %s] mismatch", r.Link, r.Target), nil
 }
