@@ -5,7 +5,6 @@ import (
 
 	"github.com/melih-ucgun/monarch/internal/core"
 
-	// Adaptör Paketleri
 	"github.com/melih-ucgun/monarch/internal/resource/adapters/files"
 	"github.com/melih-ucgun/monarch/internal/resource/adapters/identity"
 	"github.com/melih-ucgun/monarch/internal/resource/adapters/pkgmngs"
@@ -14,14 +13,13 @@ import (
 	"github.com/melih-ucgun/monarch/internal/resource/adapters/shell"
 )
 
-// CreateResource, tip ismine ve parametrelere göre doğru Resource nesnesini üretir.
-func CreateResource(resType string, name string, state string, ctx *core.SystemContext) (Resource, error) {
-	// Deprecated signature protection
-	return nil, fmt.Errorf("factory signature mismatch - please update engine first")
+// Deprecated fonksiyon placeholder
+func CreateResource(resType string, name string, state string, ctx *core.SystemContext) (core.Resource, error) {
+	return nil, fmt.Errorf("use CreateResourceWithParams")
 }
 
-// CreateResourceWithParams - Modüler Yapının Ana Giriş Noktası
-func CreateResourceWithParams(resType string, name string, params map[string]interface{}, ctx *core.SystemContext) (Resource, error) {
+// CreateResourceWithParams artık core.Resource döndürüyor
+func CreateResourceWithParams(resType string, name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
 
 	stateParam, _ := params["state"].(string)
 	if stateParam == "" {
@@ -29,8 +27,7 @@ func CreateResourceWithParams(resType string, name string, params map[string]int
 	}
 
 	switch resType {
-
-	// --- Paket Yöneticileri ---
+	// Package Managers
 	case "pacman":
 		return pkgmngs.NewPacmanAdapter(name, stateParam), nil
 	case "apt":
@@ -53,50 +50,39 @@ func CreateResourceWithParams(resType string, name string, params map[string]int
 		return pkgmngs.NewParuAdapter(name, stateParam), nil
 	case "yay":
 		return pkgmngs.NewYayAdapter(name, stateParam), nil
-
 	case "package", "pkg":
 		return detectPackageManager(name, stateParam, ctx)
 
-	// --- Dosya Sistemi ---
+	// Filesystem
 	case "file":
 		params["state"] = stateParam
 		return files.NewFileAdapter(name, params), nil
-
 	case "symlink":
 		params["state"] = stateParam
 		return files.NewSymlinkAdapter(name, params), nil
-
 	case "archive", "extract":
 		return files.NewArchiveAdapter(name, params), nil
-
-	// YENİ EKLENEN: Template
 	case "template":
 		return files.NewTemplateAdapter(name, params), nil
-
-	// YENİ EKLENEN: Line In File
 	case "line_in_file", "lineinfile":
 		params["state"] = stateParam
 		return files.NewLineInFileAdapter(name, params), nil
 
-	// --- Kimlik (Identity) ---
-	// YENİ EKLENEN: User & Group
+	// Identity
 	case "user":
 		params["state"] = stateParam
 		return identity.NewUserAdapter(name, params), nil
-
 	case "group":
 		params["state"] = stateParam
 		return identity.NewGroupAdapter(name, params), nil
 
-	// --- Diğer ---
+	// Others
 	case "git":
 		params["state"] = stateParam
 		return scm.NewGitAdapter(name, params), nil
-
 	case "service", "systemd":
 		params["state"] = stateParam
 		return service.NewServiceAdapter(name, params), nil
-
 	case "exec", "shell", "cmd":
 		return shell.NewExecAdapter(name, params), nil
 
@@ -105,8 +91,7 @@ func CreateResourceWithParams(resType string, name string, params map[string]int
 	}
 }
 
-// ... detectPackageManager fonksiyonu aynı kalıyor ...
-func detectPackageManager(name, state string, ctx *core.SystemContext) (Resource, error) {
+func detectPackageManager(name, state string, ctx *core.SystemContext) (core.Resource, error) {
 	switch ctx.Distro {
 	case "arch", "cachyos", "manjaro", "endeavouros":
 		return pkgmngs.NewPacmanAdapter(name, state), nil
