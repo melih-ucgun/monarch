@@ -4,220 +4,169 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net"
 	"os"
-	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/melih-ucgun/monarch/internal/config"
-	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
 
 type SSHTransport struct {
 	client *ssh.Client
-	host   config.Host
+	config config.Host
 }
 
 func NewSSHTransport(ctx context.Context, host config.Host) (*SSHTransport, error) {
-	// Private Key Okuma
-	key, err := os.ReadFile(host.SSHKeyPath)
-	if err != nil {
-		return nil, fmt.Errorf("ssh anahtarı okunamadı: %w", err)
-	}
+	var authMethods []ssh.AuthMethod
 
-	signer, err := ssh.ParsePrivateKey(key)
-	if err != nil {
-		return nil, fmt.Errorf("ssh anahtarı parse edilemedi: %w", err)
+	if host.SSHKeyPath != "" {
+		key, err := os.ReadFile(host.SSHKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("ssh anahtarı okunamadı: %w", err)
+		}
+		signer, err := ssh.ParsePrivateKey(key)
+		if err != nil {
+			return nil, fmt.Errorf("ssh anahtarı parse edilemedi: %w", err)
+		}
+		authMethods = append(authMethods, ssh.PublicKeys(signer))
+	} else {
+		// Şifre ile kimlik doğrulama
+		authMethods = append(authMethods, ssh.Password(host.BecomePassword))
 	}
 
 	sshConfig := &ssh.ClientConfig{
-		User: host.User,
-		Auth: []ssh.AuthMethod{
-			ssh.PublicKeys(signer),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // DİKKAT: Prod ortamında known_hosts kullanılmalı
+		User:            host.User,
+		Auth:            authMethods,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // Not: Prodüksiyonda known_hosts doğrulaması önerilir
 		Timeout:         10 * time.Second,
 	}
 
-	// HostName port içeriyor mu kontrol et, içermiyorsa ekle
-	address := host.HostName
-	if host.Port != 0 {
-		address = fmt.Sprintf("%s:%d", host.HostName, host.Port)
-	} else if _, _, err := net.SplitHostPort(address); err != nil {
-		address = fmt.Sprintf("%s:22", address) // Varsayılan port
-	}
-
-	client, err := ssh.Dial("tcp", address, sshConfig)
+	addr := fmt.Sprintf("%s:%d", host.Address, host.Port)
+	client, err := ssh.Dial("tcp", addr, sshConfig)
 	if err != nil {
-		return nil, fmt.Errorf("ssh bağlantısı başarısız: %w", err)
+		// DÜZELTME: host.HostName yerine host.Name kullanıldı
+		return nil, fmt.Errorf("ssh bağlantı hatası (%s): %w", host.Name, err)
 	}
 
-	return &SSHTransport{
-		client: client,
-		host:   host,
-	}, nil
+	return &SSHTransport{client: client, config: host}, nil
 }
 
 func (t *SSHTransport) Close() error {
-	return t.client.Close()
-}
-
-func (t *SSHTransport) CopyFile(ctx context.Context, src, dst string) error {
-	// SFTP Client Oluştur
-	sftpClient, err := sftp.NewClient(t.client)
-	if err != nil {
-		return fmt.Errorf("sftp başlatılamadı: %w", err)
+	if t.client != nil {
+		return t.client.Close()
 	}
-	defer sftpClient.Close()
-
-	// Kaynak dosyayı aç
-	localFile, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("yerel dosya açılamadı: %w", err)
-	}
-	defer localFile.Close()
-
-	// Hedef dizini oluştur (gerekirse)
-	dstDir := filepath.Dir(dst)
-	t.RunRemote(ctx, fmt.Sprintf("mkdir -p %s", dstDir))
-
-	// Hedef dosyayı oluştur
-	remoteFile, err := sftpClient.Create(dst)
-	if err != nil {
-		return fmt.Errorf("uzak dosya oluşturulamadı: %w", err)
-	}
-	defer remoteFile.Close()
-
-	// Kopyala
-	if _, err := io.Copy(remoteFile, localFile); err != nil {
-		return fmt.Errorf("dosya kopyalanamadı: %w", err)
-	}
-
-	// Dosya izinlerini ayarla (Executable olması gerekebilir)
-	remoteFile.Chmod(0755)
-
 	return nil
 }
 
-func (t *SSHTransport) RunRemote(ctx context.Context, command string) error {
+// RunRemoteSecure: Komutu çalıştırır, sudo gerekirse şifreyi pipe ile verir.
+// Bu fonksiyon, parolanın process listesinde veya history'de görünmesini engeller.
+func (t *SSHTransport) RunRemoteSecure(ctx context.Context, cmdStr string, sudoPassword string, stdinData string) error {
 	session, err := t.client.NewSession()
 	if err != nil {
 		return err
 	}
 	defer session.Close()
 
-	// Çıktıları yönlendir (Debug için)
-	// session.Stdout = os.Stdout
-	// session.Stderr = os.Stderr
-
-	return session.Run(command)
-}
-
-// RunRemoteSecure: Sudo şifresini güvenli bir şekilde stdin'den verir.
-// input: Eğer komut stdin bekliyorsa (örn: config dosyası içeriği) buraya verilir.
-func (t *SSHTransport) RunRemoteSecure(ctx context.Context, command, sudoPassword, input string) error {
-	session, err := t.client.NewSession()
-	if err != nil {
-		return err
+	// Eğer sudo kullanılıyorsa, komutu şifre isteyecek şekilde (promptsuz) ayarla
+	finalCmd := cmdStr
+	if t.config.BecomeMethod == "sudo" && sudoPassword != "" {
+		// -S: Stdin'den şifre oku
+		// -p '': Prompt gösterme
+		finalCmd = fmt.Sprintf("sudo -S -p '' %s", cmdStr)
 	}
-	defer session.Close()
 
 	stdin, err := session.StdinPipe()
 	if err != nil {
 		return err
 	}
 
-	// stdout ve stderr'i yakala
+	// Çıktıları yönlendir
 	session.Stdout = os.Stdout
 	session.Stderr = os.Stderr
 
-	// Komutu başlat
-	// Sudo şifresini sorması için -S parametresi kullanılır: echo 'password' | sudo -S command
-	// Ancak biz daha güvenli olan stdin yöntemini kullanacağız.
-
-	// Eğer sudo şifresi varsa komutu sudo ile sarmala
-	finalCmd := command
-	if sudoPassword != "" {
-		finalCmd = fmt.Sprintf("sudo -S -p '' %s", command)
-	}
-
 	if err := session.Start(finalCmd); err != nil {
-		return fmt.Errorf("komut başlatılamadı: %w", err)
+		return err
 	}
 
-	// Goroutine ile stdin beslemesi yap
+	// Stdin yönetimi (Şifre ve veri gönderimi)
 	go func() {
 		defer stdin.Close()
-
-		// Eğer sudo şifresi gerekiyorsa önce onu yaz
-		if sudoPassword != "" {
+		// 1. Önce sudo şifresini gönder (Güvenli aktarım)
+		if t.config.BecomeMethod == "sudo" && sudoPassword != "" {
 			fmt.Fprintln(stdin, sudoPassword)
 		}
-
-		// Ardından asıl inputu (varsa) yaz
-		if input != "" {
-			fmt.Fprint(stdin, input)
+		// 2. Sonra asıl datayı gönder (varsa)
+		if stdinData != "" {
+			io.WriteString(stdin, stdinData)
 		}
 	}()
 
-	// Komutun bitmesini bekle
-	if err := session.Wait(); err != nil {
-		// Exit code kontrolü yapılabilir
-		return fmt.Errorf("komut hatası: %w", err)
+	return session.Wait()
+}
+
+func (t *SSHTransport) CopyFile(ctx context.Context, localPath, remotePath string) error {
+	localFile, err := os.Open(localPath)
+	if err != nil {
+		return err
+	}
+	defer localFile.Close()
+
+	stat, err := localFile.Stat()
+	if err != nil {
+		return err
 	}
 
+	session, err := t.client.NewSession()
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+
+	go func() {
+		w, _ := session.StdinPipe()
+		defer w.Close()
+		// SCP Protokolü başlığı
+		fmt.Fprintf(w, "C0%o %d %s\n", stat.Mode().Perm(), stat.Size(), remotePath)
+		io.Copy(w, localFile)
+		fmt.Fprint(w, "\x00")
+	}()
+
+	// scp -t (sink mode) ile karşı tarafta dosyayı karşıla
+	return session.Run(fmt.Sprintf("scp -t %s", remotePath))
+}
+
+func (t *SSHTransport) DownloadFile(ctx context.Context, remotePath, localPath string) error {
+	// İleride download özelliği gerekirse burası doldurulabilir.
 	return nil
 }
 
-func (t *SSHTransport) GetRemoteSystemInfo(ctx context.Context) (osName, arch string, err error) {
+func (t *SSHTransport) GetRemoteSystemInfo(ctx context.Context) (string, string, error) {
 	session, err := t.client.NewSession()
 	if err != nil {
 		return "", "", err
 	}
 	defer session.Close()
 
-	// GOOS ve GOARCH formatında çıktı almak için uname kullanıyoruz
-	// Linux -> linux, x86_64 -> amd64, aarch64 -> arm64
-	cmd := `uname -s | tr '[:upper:]' '[:lower:]'; uname -m`
-	output, err := session.Output(cmd)
+	// OS ve Arch bilgisini öğren
+	out, err := session.Output("uname -s -m")
 	if err != nil {
-		return "", "", fmt.Errorf("sistem bilgisi alınamadı: %w", err)
+		return "", "", err
+	}
+	parts := strings.Fields(string(out))
+	if len(parts) < 2 {
+		return "", "", fmt.Errorf("bilinmeyen sistem çıktısı: %s", string(out))
 	}
 
-	var rawOS, rawArch string
-	fmt.Sscanf(string(output), "%s\n%s", &rawOS, &rawArch)
+	osName := strings.ToLower(parts[0]) // Linux -> linux
+	arch := strings.ToLower(parts[1])   // x86_64 -> amd64
 
-	// Arch mapping
-	arch = rawArch
-	if rawArch == "x86_64" {
+	// Mimari isimlerini Go standartlarına çevir
+	if arch == "x86_64" {
 		arch = "amd64"
-	} else if rawArch == "aarch64" {
+	} else if arch == "aarch64" {
 		arch = "arm64"
 	}
 
-	return rawOS, arch, nil
-}
-
-func (t *SSHTransport) DownloadFile(ctx context.Context, remotePath, localPath string) error {
-	sftpClient, err := sftp.NewClient(t.client)
-	if err != nil {
-		return err
-	}
-	defer sftpClient.Close()
-
-	remoteFile, err := sftpClient.Open(remotePath)
-	if err != nil {
-		return err
-	}
-	defer remoteFile.Close()
-
-	localFile, err := os.Create(localPath)
-	if err != nil {
-		return err
-	}
-	defer localFile.Close()
-
-	_, err = remoteFile.WriteTo(localFile)
-	return err
+	return osName, arch, nil
 }

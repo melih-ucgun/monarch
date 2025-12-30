@@ -1,45 +1,37 @@
 package config
 
 import (
-	"reflect"
 	"testing"
 )
 
 func TestSortResources(t *testing.T) {
-	// Basit bir senaryo: Sıralama değişmeden dönmeli (şimdilik)
-	input := [][]ResourceConfig{
-		{
-			{ID: "res1", Type: "file"},
-		},
-		{
-			{ID: "res2", Type: "service"},
-		},
+	// Girdi artık düz bir liste: []ResourceConfig
+	input := []ResourceConfig{
+		{ID: "res1", Type: "file"},
+		{ID: "res2", Type: "package"},
 	}
 
-	expected := input
-
-	result, err := SortResources(input)
+	levels, err := SortResources(input)
 	if err != nil {
 		t.Fatalf("SortResources hata döndü: %v", err)
 	}
 
-	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("Beklenen: %v, Alınan: %v", expected, result)
+	// Mevcut basit implementasyon her şeyi tek katmana koyduğu için:
+	if len(levels) != 1 {
+		t.Errorf("Beklenen katman sayısı 1, gelen %d", len(levels))
+	}
+
+	if len(levels[0]) != 2 {
+		t.Errorf("Beklenen kaynak sayısı 2, gelen %d", len(levels[0]))
 	}
 }
 
-func TestFlatten(t *testing.T) {
-	input := [][]ResourceConfig{
-		{{ID: "1"}, {ID: "2"}},
-		{{ID: "3"}},
+func TestSortEmptyResources(t *testing.T) {
+	levels, err := SortResources(nil)
+	if err != nil {
+		t.Fatalf("Boş listede hata döndü: %v", err)
 	}
-	expectedLen := 3
-
-	flat := Flatten(input)
-	if len(flat) != expectedLen {
-		t.Errorf("Beklenen uzunluk %d, alınan %d", expectedLen, len(flat))
-	}
-	if flat[2].ID != "3" {
-		t.Errorf("Flatten sıralaması hatalı")
+	if levels != nil {
+		t.Error("Boş girdi için nil dönmeliydi")
 	}
 }

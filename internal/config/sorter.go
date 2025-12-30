@@ -1,37 +1,40 @@
 package config
 
-// SortResources, kaynakları bağımlılıklarına göre sıralar (Topological Sort).
-// Not: Şu anki versiyonda sadece ResourceConfig listesini "level" (katman) mantığına göre
-// ayırabiliriz veya basitçe sıralı döndürebiliriz.
-// İleride "depends_on" alanı eklenirse burası gerçek bir DAG (Graph) algoritması içermeli.
-func SortResources(resources [][]ResourceConfig) ([][]ResourceConfig, error) {
-	// Şimdilik konfigürasyon dosyasındaki sıraya sadık kalıyoruz.
-	// resources zaten [][]ResourceConfig tipinde olduğu için ekstra bir dönüşüm gerekmez.
-
-	// Eğer düz bir liste gelirse ve biz bunu katmanlara ayırmak istiyorsak
-	// burada işlem yapılabilir. Ancak şu anki config yapısı (YAML) zaten katmanlı (array of arrays)
-	// veya gruplu geldiği için olduğu gibi dönebiliriz.
-
-	// Örnek basit validasyon:
+// SortResources, kaynakları bağımlılıklarına göre sıralar ve katmanlara ayırır.
+// Şimdilik basit bir implementasyon: Tüm kaynakları tek bir katmanda döndürür.
+// İleride 'depends_on' mantığı eklendiğinde burası topolojik sıralama (DAG) yapacaktır.
+func SortResources(resources []ResourceConfig) ([][]ResourceConfig, error) {
 	if len(resources) == 0 {
-		return nil, nil // Boş ise hata değil, boş liste dön
+		return nil, nil
 	}
 
-	return resources, nil
+	// TODO: Topological Sort Implementation
+	// Şu an için bağımlılık yönetimi yok varsayıyoruz ve
+	// YAML dosyasındaki sırayı koruyarak tek bir 'batch' (katman) oluşturuyoruz.
+	// Engine bu katmanları sırayla işler, katman içindekileri ise paralel işleyebilir.
+
+	// Tüm kaynakları tek bir katmana koy
+	firstLayer := make([]ResourceConfig, len(resources))
+	copy(firstLayer, resources)
+
+	return [][]ResourceConfig{firstLayer}, nil
 }
 
-// Bu yardımcı fonksiyon, ileride bağımlılık analizi yapıldığında kullanılabilir.
-// Şu an ResourceConfig içinde "DependsOn" alanı olmadığı için pasif.
-func validateDependencies(res ResourceConfig, allResources map[string]ResourceConfig) error {
-	// Örn: if res.DependsOn != "" && allResources[res.DependsOn] == nil { error }
+// CheckCycles, döngüsel bağımlılık olup olmadığını kontrol eder.
+// (Şimdilik placeholder)
+func CheckCycles(resources []ResourceConfig) error {
 	return nil
 }
 
-// Flatten, katmanlı yapıyı düz listeye çevirir (İhtiyaç olursa)
-func Flatten(layers [][]ResourceConfig) []ResourceConfig {
-	var flat []ResourceConfig
-	for _, layer := range layers {
-		flat = append(flat, layer...)
-	}
-	return flat
+/*
+İleride kullanılacak DAG yapısı örneği:
+
+type Graph struct {
+    Nodes map[string]ResourceConfig
+    Edges map[string][]string
 }
+
+func buildGraph(resources []ResourceConfig) *Graph {
+    ...
+}
+*/

@@ -7,33 +7,41 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ResourceConfig, YAML'dan okunan ham kaynak tanımıdır.
-// Factory bu yapıyı kullanarak gerçek Resource nesnelerini üretir.
+// Config, monarch.yaml dosyasının kök yapısını temsil eder.
+type Config struct {
+	Vars      map[string]string `yaml:"vars"`      // Global değişkenler
+	Resources []ResourceConfig  `yaml:"resources"` // Kaynak listesi
+	Hosts     []Host            `yaml:"hosts"`     // Uzak sunucular (Opsiyonel)
+}
+
+// ResourceConfig, her bir kaynağın (file, user, package vb.) konfigürasyonunu tutar.
 type ResourceConfig struct {
 	ID         string                 `yaml:"id"`
 	Type       string                 `yaml:"type"`
-	Parameters map[string]interface{} `yaml:"params"`
+	Parameters map[string]interface{} `yaml:"parameters"` // mapstructure ile işlenecek
 }
 
+// Host, uzak sunucu bağlantı bilgilerini tutar.
 type Host struct {
 	Name           string `yaml:"name"`
-	HostName       string `yaml:"hostname"`
+	Address        string `yaml:"address"`
 	User           string `yaml:"user"`
 	Port           int    `yaml:"port"`
 	SSHKeyPath     string `yaml:"ssh_key_path"`
-	BecomePassword string `yaml:"become_password"` // Sudo şifresi (Age ile şifrelenecek)
+	BecomeMethod   string `yaml:"become_method"`   // sudo, su
+	BecomePassword string `yaml:"become_password"` // Opsiyonel (Vault'tan gelmesi önerilir)
 }
 
-type Config struct {
-	Vars      map[string]string  `yaml:"vars"`
-	Hosts     []Host             `yaml:"hosts"`
-	Resources [][]ResourceConfig `yaml:"resources"` // Katmanlı yapı
-}
-
+// LoadConfig, belirtilen yoldaki YAML dosyasını okur ve Config struct'ına çevirir.
 func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("config dosyası okunamadı: %w", err)
+		return nil, fmt.Errorf("dosya okuma hatası: %w", err)
+	}
+
+	// Eğer dosya boşsa veya sadece yorum varsa hata vermemeli, boş config dönmeli
+	if len(data) == 0 {
+		return &Config{}, nil
 	}
 
 	var cfg Config
