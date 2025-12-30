@@ -1,0 +1,65 @@
+package pkgmngs
+
+import (
+	"fmt"
+
+	"github.com/melih-ucgun/monarch/internal/core"
+	"github.com/melih-ucgun/monarch/internal/resource"
+)
+
+type SnapAdapter struct {
+	resource.BaseResource
+	State string
+}
+
+func NewSnapAdapter(name string, state string) *SnapAdapter {
+	if state == "" {
+		state = "present"
+	}
+	return &SnapAdapter{
+		BaseResource: resource.BaseResource{Name: name, Type: "package"},
+		State:        state,
+	}
+}
+
+func (r *SnapAdapter) Validate() error {
+	if r.Name == "" {
+		return fmt.Errorf("package name is required for snap")
+	}
+	return nil
+}
+
+func (r *SnapAdapter) Check(ctx *core.SystemContext) (bool, error) {
+	// snap list <package>
+	installed := isInstalled("snap", "list", r.Name)
+
+	if r.State == "absent" {
+		return installed, nil
+	}
+	return !installed, nil
+}
+
+func (r *SnapAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
+	needsAction, _ := r.Check(ctx)
+	if !needsAction {
+		return core.SuccessNoChange(fmt.Sprintf("Snap %s already %s", r.Name, r.State)), nil
+	}
+
+	if ctx.DryRun {
+		return core.SuccessChange(fmt.Sprintf("[DryRun] snap %s %s", r.State, r.Name)), nil
+	}
+
+	var args []string
+	if r.State == "absent" {
+		args = []string{"remove", r.Name}
+	} else {
+		args = []string{"install", r.Name}
+	}
+
+	out, err := runCommand("snap", args...)
+	if err != nil {
+		return core.Failure(err, "Snap failed: "+out), err
+	}
+
+	return core.SuccessChange(fmt.Sprintf("Snap processed %s", r.Name)), nil
+}

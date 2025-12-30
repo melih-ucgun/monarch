@@ -1,86 +1,80 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"log/slog"
 	"os"
-	"os/signal"
 	"time"
 
-	"github.com/melih-ucgun/monarch/internal/config"
-	"github.com/melih-ucgun/monarch/internal/engine"
 	"github.com/spf13/cobra"
 )
 
+var interval int
+
 var watchCmd = &cobra.Command{
-	Use:   "watch",
-	Short: "Sürekli olarak konfigürasyonu uygular (Daemon modu)",
-	Long:  `Belirtilen aralıklarla sistem durumunu kontrol eder ve sapma varsa düzeltir.`,
+	Use:   "watch [config_file]",
+	Short: "Watch for changes in the configuration file and apply automatically",
+	Long: `Monitors the specified configuration file (default: monarch.yaml) for changes.
+When a change is detected, it automatically runs 'apply'.
+Polls the file system every few seconds (configurable).`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cfgFile, _ := cmd.Flags().GetString("config")
-		intervalStr, _ := cmd.Flags().GetString("interval")
-		host, _ := cmd.Flags().GetString("host")
-
-		interval, err := time.ParseDuration(intervalStr)
-		if err != nil {
-			fmt.Printf("Geçersiz zaman aralığı: %v\n", err)
-			os.Exit(1)
+		configFile := "monarch.yaml"
+		if len(args) > 0 {
+			configFile = args[0]
 		}
 
-		// 1. Context ve Sinyal Yakalama
-		// Program Ctrl+C ile durdurulana kadar çalışacak bir context oluşturuyoruz.
-		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer cancel()
+		fmt.Printf("👀 Watching '%s' for changes (Interval: %ds)...\n", configFile, interval)
+		fmt.Println("Press Ctrl+C to stop.")
 
-		cfg, err := config.LoadConfig(cfgFile)
-		if err != nil {
-			fmt.Printf("Konfigürasyon hatası: %v\n", err)
-			os.Exit(1)
+		// İlk başlangıçta bir kez çalıştır
+		if err := runApply(configFile, dryRun); err != nil {
+			fmt.Printf("⚠️ Initial apply failed, but keeping watch...\n")
 		}
 
-		opts := engine.EngineOptions{
-			DryRun:     false,
-			HostName:   host,
-			ConfigFile: cfgFile,
-		}
-
-		recon := engine.NewReconciler(cfg, opts)
-		slog.Info("Monarch Watch Modu Başlatıldı", "interval", interval)
-
-		// 2. Ana Döngü
-		// İlk çalışmayı hemen yap
-		if _, err := recon.Run(ctx); err != nil {
-			slog.Error("İlk çalıştırma hatası", "error", err)
-		}
-
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				// Ctrl+C basıldı, güvenli çıkış yap
-				slog.Info("Watch modu sonlandırılıyor...")
-				return
-			case <-ticker.C:
-				// Zamanı gelince çalıştır
-				// Her seferinde context'in iptal edilip edilmediğini kontrol eden Run çağrısı
-				if _, err := recon.Run(ctx); err != nil {
-					// Context iptal edildiyse loop'u kırmaya gerek yok, select bloğu zaten halleder
-					// Ama diğer hataları logla
-					if err != context.Canceled {
-						slog.Error("Reconcile hatası", "error", err)
-					}
-				}
-			}
-		}
+		watchLoop(configFile, interval)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(watchCmd)
-	watchCmd.Flags().StringP("config", "c", "monarch.yaml", "Konfigürasyon dosyası")
-	watchCmd.Flags().StringP("interval", "i", "5m", "Kontrol aralığı (örn: 30s, 5m, 1h)")
-	watchCmd.Flags().String("host", "", "Uzak sunucu adı")
+	watchCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Simulate changes without applying them")
+	watchCmd.Flags().IntVarP(&interval, "interval", "i", 2, "Polling interval in seconds")
+}
+
+func watchLoop(filename string, intervalSec int) {
+	lastModTime := time.Time{}
+
+	// İlk dosya bilgisini al
+	info, err := os.Stat(filename)
+	if err == nil {
+		lastModTime = info.ModTime()
+	}
+
+	ticker := time.NewTicker(time.Duration(intervalSec) * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		info, err := os.Stat(filename)
+		if err != nil {
+			if os.IsNotExist(err) {
+				fmt.Printf("\r⚠️ Config file '%s' not found. Waiting...", filename)
+			}
+			continue
+		}
+
+		// Değişiklik kontrolü
+		if info.ModTime().After(lastModTime) {
+			fmt.Println("\n\n🔄 Change detected! Re-applying configuration...")
+
+			// Güncel zamanı kaydet
+			lastModTime = info.ModTime()
+
+			// Apply işlemini çağır (cmd/apply.go içindeki fonksiyonu kullanıyoruz)
+			// Not: runApply fonksiyonu aynı pakette (cmd) olduğu için erişilebilir.
+			if err := runApply(filename, dryRun); err != nil {
+				fmt.Printf("❌ Apply failed: %v\n", err)
+			} else {
+				fmt.Printf("✅ Update successful. Watching for new changes...\n")
+			}
+		}
+	}
 }

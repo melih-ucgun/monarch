@@ -1,0 +1,66 @@
+package pkgmngs
+
+import (
+	"fmt"
+
+	"github.com/melih-ucgun/monarch/internal/core"
+	"github.com/melih-ucgun/monarch/internal/resource"
+)
+
+type FlatpakAdapter struct {
+	resource.BaseResource
+	State string
+}
+
+func NewFlatpakAdapter(name string, state string) *FlatpakAdapter {
+	if state == "" {
+		state = "present"
+	}
+	return &FlatpakAdapter{
+		BaseResource: resource.BaseResource{Name: name, Type: "package"},
+		State:        state,
+	}
+}
+
+func (r *FlatpakAdapter) Validate() error {
+	if r.Name == "" {
+		return fmt.Errorf("package name is required for flatpak")
+	}
+	return nil
+}
+
+func (r *FlatpakAdapter) Check(ctx *core.SystemContext) (bool, error) {
+	// flatpak info <package>
+	installed := isInstalled("flatpak", "info", r.Name)
+
+	if r.State == "absent" {
+		return installed, nil
+	}
+	return !installed, nil
+}
+
+func (r *FlatpakAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
+	needsAction, _ := r.Check(ctx)
+	if !needsAction {
+		return core.SuccessNoChange(fmt.Sprintf("Flatpak %s already %s", r.Name, r.State)), nil
+	}
+
+	if ctx.DryRun {
+		return core.SuccessChange(fmt.Sprintf("[DryRun] flatpak %s %s", r.State, r.Name)), nil
+	}
+
+	var args []string
+	if r.State == "absent" {
+		args = []string{"uninstall", "-y", r.Name}
+	} else {
+		// Flatpak genelde non-interactive kurulum için -y ister
+		args = []string{"install", "-y", r.Name}
+	}
+
+	out, err := runCommand("flatpak", args...)
+	if err != nil {
+		return core.Failure(err, "Flatpak failed: "+out), err
+	}
+
+	return core.SuccessChange(fmt.Sprintf("Flatpak processed %s", r.Name)), nil
+}

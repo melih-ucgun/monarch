@@ -1,72 +1,99 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"os/signal"
+	"path/filepath"
+
+	"github.com/spf13/cobra"
 
 	"github.com/melih-ucgun/monarch/internal/config"
-	"github.com/melih-ucgun/monarch/internal/engine"
-	"github.com/spf13/cobra"
+	"github.com/melih-ucgun/monarch/internal/core"
+	"github.com/melih-ucgun/monarch/internal/resource"
+	"github.com/melih-ucgun/monarch/internal/state" // Yeni import
+	"github.com/melih-ucgun/monarch/internal/system"
 )
 
-// applyCmd represents the apply command
+var dryRun bool
+
 var applyCmd = &cobra.Command{
-	Use:   "apply",
-	Short: "Konfigürasyonu uygular (Apply configuration)",
-	Long:  `Belirtilen konfigürasyon dosyasını okuyarak sistem durumunu günceller.`,
+	Use:   "apply [config_file]",
+	Short: "Apply the configuration to the system",
+	Long: `Reads the configuration file and ensures system state matches desired state.
+Updates .monarch/state.json with the results.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cfgFile, _ := cmd.Flags().GetString("config")
-		dryRun, _ := cmd.Flags().GetBool("dry-run")
-		host, _ := cmd.Flags().GetString("host")
+		configFile := "monarch.yaml"
+		if len(args) > 0 {
+			configFile = args[0]
+		}
 
-		// 1. Context Oluşturma: Sinyalleri (Ctrl+C) yakala
-		// Background context üzerine iptal edilebilir (WithCancel) bir yapı kuruyoruz.
-		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer cancel() // Fonksiyon biterken temizlik yap
-
-		// İsterseniz burada bir Timeout da ekleyebilirsiniz:
-		// ctx, cancel = context.WithTimeout(ctx, 30*time.Minute)
-
-		cfg, err := config.LoadConfig(cfgFile)
-		if err != nil {
-			fmt.Printf("Konfigürasyon hatası: %v\n", err)
+		if err := runApply(configFile, dryRun); err != nil {
 			os.Exit(1)
-		}
-
-		opts := engine.EngineOptions{
-			DryRun:     dryRun,
-			HostName:   host,
-			ConfigFile: cfgFile,
-		}
-
-		rec := engine.NewReconciler(cfg, opts)
-
-		// 2. Engine'i Context ile Başlat
-		drifts, err := rec.Run(ctx)
-
-		// 3. Hata Yönetimi: İptal mi edildi yoksa hata mı var?
-		if err != nil {
-			if err == context.Canceled {
-				fmt.Println("\n❌ İşlem kullanıcı tarafından iptal edildi.")
-				os.Exit(130) // 130 = SIGINT çıkış kodu standardı
-			}
-			fmt.Printf("\n❌ Hata oluştu: %v\n", err)
-			os.Exit(1)
-		}
-
-		if drifts == 0 {
-			fmt.Println("\n✅ Sistem zaten istenen durumda.")
-		} else {
-			fmt.Printf("\n✅ %d değişiklik uygulandı.\n", drifts)
 		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(applyCmd)
-	applyCmd.Flags().StringP("config", "c", "monarch.yaml", "Konfigürasyon dosyası")
-	applyCmd.Flags().Bool("dry-run", false, "Değişiklik yapmadan ne olacağını göster")
-	applyCmd.Flags().String("host", "", "Uzak sunucu adı (hosts listesindeki name)")
+	applyCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Simulate changes without applying them")
+}
+
+func runApply(configFile string, isDryRun bool) error {
+	fmt.Printf("🚀 Starting Monarch Apply (DryRun: %v)...\n", isDryRun)
+
+	// 1. Sistemi Tespit Et
+	ctx := system.Detect(isDryRun)
+	fmt.Printf("🔍 Detected System: %s (%s) | User: %s\n", ctx.Distro, ctx.OS, ctx.User)
+
+	// 2. State Yöneticisini Başlat
+	// Kullanıcının ev dizininde veya proje dizininde .monarch/state.json tutabiliriz.
+	// Şimdilik çalışma dizininde tutalım.
+	statePath := filepath.Join(".monarch", "state.json")
+	stateMgr, err := state.NewManager(statePath)
+	if err != nil {
+		fmt.Printf("⚠️ Could not initialize state manager: %v\n", err)
+		// State olmadan da çalışabilir ama uyaralım
+	}
+
+	// 3. Konfigürasyonu Yükle
+	cfg, err := config.LoadConfig(configFile)
+	if err != nil {
+		fmt.Printf("❌ Error loading config file '%s': %v\n", configFile, err)
+		return err
+	}
+
+	// 4. Kaynakları Sırala
+	sortedResources, err := config.SortResources(cfg.Resources)
+	if err != nil {
+		fmt.Printf("❌ Error sorting resources: %v\n", err)
+		return err
+	}
+
+	// 5. Motoru (Engine) Hazırla (State Manager Enjekte Edildi)
+	eng := core.NewEngine(ctx, stateMgr)
+
+	var items []core.ConfigItem
+	for _, res := range sortedResources {
+		items = append(items, core.ConfigItem{
+			Name:   res.Name,
+			Type:   res.Type,
+			State:  res.State,
+			Params: res.Params,
+		})
+	}
+
+	fmt.Printf("📦 Processing %d resources...\n", len(items))
+
+	// 6. Motoru Ateşle
+	err = eng.Run(items, func(t, n string, p map[string]interface{}, c *core.SystemContext) (core.ApplyableResource, error) {
+		return resource.CreateResourceWithParams(t, n, p, c)
+	})
+
+	if err != nil {
+		fmt.Printf("\n⚠️ Completed with errors: %v\n", err)
+		return err
+	}
+
+	fmt.Println("\n✨ Configuration applied successfully!")
+	return nil
 }

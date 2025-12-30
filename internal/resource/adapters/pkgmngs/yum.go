@@ -1,0 +1,63 @@
+package pkgmngs
+
+import (
+	"fmt"
+
+	"github.com/melih-ucgun/monarch/internal/core"
+	"github.com/melih-ucgun/monarch/internal/resource"
+)
+
+type YumAdapter struct {
+	resource.BaseResource
+	State string
+}
+
+func NewYumAdapter(name string, state string) *YumAdapter {
+	if state == "" {
+		state = "present"
+	}
+	return &YumAdapter{
+		BaseResource: resource.BaseResource{Name: name, Type: "package"},
+		State:        state,
+	}
+}
+
+func (r *YumAdapter) Validate() error {
+	if r.Name == "" {
+		return fmt.Errorf("package name is required for yum")
+	}
+	return nil
+}
+
+func (r *YumAdapter) Check(ctx *core.SystemContext) (bool, error) {
+	installed := isInstalled("rpm", "-q", r.Name)
+	if r.State == "absent" {
+		return installed, nil
+	}
+	return !installed, nil
+}
+
+func (r *YumAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
+	needsAction, _ := r.Check(ctx)
+	if !needsAction {
+		return core.SuccessNoChange(fmt.Sprintf("Package %s already %s", r.Name, r.State)), nil
+	}
+
+	if ctx.DryRun {
+		return core.SuccessChange(fmt.Sprintf("[DryRun] yum %s %s", r.State, r.Name)), nil
+	}
+
+	var args []string
+	if r.State == "absent" {
+		args = []string{"remove", "-y", r.Name}
+	} else {
+		args = []string{"install", "-y", r.Name}
+	}
+
+	out, err := runCommand("yum", args...)
+	if err != nil {
+		return core.Failure(err, "Yum failed: "+out), err
+	}
+
+	return core.SuccessChange(fmt.Sprintf("Yum processed %s", r.Name)), nil
+}

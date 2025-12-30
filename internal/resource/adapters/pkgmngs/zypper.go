@@ -1,0 +1,67 @@
+package pkgmngs
+
+import (
+	"fmt"
+
+	"github.com/melih-ucgun/monarch/internal/core"
+	"github.com/melih-ucgun/monarch/internal/resource"
+)
+
+type ZypperAdapter struct {
+	resource.BaseResource
+	State string
+}
+
+func NewZypperAdapter(name string, state string) *ZypperAdapter {
+	if state == "" {
+		state = "present"
+	}
+	return &ZypperAdapter{
+		BaseResource: resource.BaseResource{Name: name, Type: "package"},
+		State:        state,
+	}
+}
+
+func (r *ZypperAdapter) Validate() error {
+	if r.Name == "" {
+		return fmt.Errorf("package name is required for zypper")
+	}
+	return nil
+}
+
+func (r *ZypperAdapter) Check(ctx *core.SystemContext) (bool, error) {
+	// rpm -q genelde en hızlı yoldur ama zypper search -i de olur
+	// rpm -q <package>
+	installed := isInstalled("rpm", "-q", r.Name)
+
+	if r.State == "absent" {
+		return installed, nil
+	}
+	return !installed, nil
+}
+
+func (r *ZypperAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
+	needsAction, _ := r.Check(ctx)
+	if !needsAction {
+		return core.SuccessNoChange(fmt.Sprintf("Package %s already %s", r.Name, r.State)), nil
+	}
+
+	if ctx.DryRun {
+		return core.SuccessChange(fmt.Sprintf("[DryRun] zypper %s %s", r.State, r.Name)), nil
+	}
+
+	var args []string
+	if r.State == "absent" {
+		args = []string{"remove", "-y", r.Name}
+	} else {
+		// --non-interactive = -n
+		args = []string{"install", "-n", r.Name}
+	}
+
+	out, err := runCommand("zypper", args...)
+	if err != nil {
+		return core.Failure(err, "Zypper failed: "+out), err
+	}
+
+	return core.SuccessChange(fmt.Sprintf("Zypper processed %s", r.Name)), nil
+}
