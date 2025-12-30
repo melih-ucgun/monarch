@@ -36,6 +36,10 @@ func init() {
 	Register("git", newGitResource)
 	Register("symlink", newSymlinkResource)
 	Register("container", newContainerResource)
+	// --- Yeni Eklenenler ---
+	Register("download", newDownloadResource)
+	Register("user", newUserResource)
+	Register("line_in_file", newLineInFileResource)
 }
 
 // decodeConfig, parametre map'ini struct'a çevirir.
@@ -43,7 +47,7 @@ func decodeConfig(input interface{}, result interface{}) error {
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		Metadata:         nil,
 		Result:           result,
-		WeaklyTypedInput: true, // string -> int, string -> bool dönüşümleri için esneklik
+		WeaklyTypedInput: true,
 	})
 	if err != nil {
 		return err
@@ -51,13 +55,10 @@ func decodeConfig(input interface{}, result interface{}) error {
 	return decoder.Decode(input)
 }
 
-// --- Factory Fonksiyonları (Varsayılan Değerler Burada Atanır) ---
+// --- Factory Fonksiyonları ---
 
 func newFileResource(cfg config.ResourceConfig) (Resource, error) {
-	res := &FileResource{
-		CanonicalID: cfg.ID,
-		Mode:        "0644", // Varsayılan dosya izni
-	}
+	res := &FileResource{CanonicalID: cfg.ID, Mode: "0644"}
 	if err := decodeConfig(cfg.Parameters, res); err != nil {
 		return nil, err
 	}
@@ -65,9 +66,7 @@ func newFileResource(cfg config.ResourceConfig) (Resource, error) {
 }
 
 func newExecResource(cfg config.ResourceConfig) (Resource, error) {
-	res := &ExecResource{
-		CanonicalID: cfg.ID,
-	}
+	res := &ExecResource{CanonicalID: cfg.ID}
 	if err := decodeConfig(cfg.Parameters, res); err != nil {
 		return nil, err
 	}
@@ -75,11 +74,7 @@ func newExecResource(cfg config.ResourceConfig) (Resource, error) {
 }
 
 func newPackageResource(cfg config.ResourceConfig) (Resource, error) {
-	res := &PackageResource{
-		CanonicalID: cfg.ID,
-		ManagerName: "pacman",    // Varsayılan paket yöneticisi
-		State:       "installed", // Varsayılan durum
-	}
+	res := &PackageResource{CanonicalID: cfg.ID, ManagerName: "pacman", State: "installed"}
 	if err := decodeConfig(cfg.Parameters, res); err != nil {
 		return nil, err
 	}
@@ -87,11 +82,7 @@ func newPackageResource(cfg config.ResourceConfig) (Resource, error) {
 }
 
 func newServiceResource(cfg config.ResourceConfig) (Resource, error) {
-	res := &ServiceResource{
-		CanonicalID: cfg.ID,
-		State:       "started", // Varsayılan durum
-		Enabled:     true,      // Varsayılan olarak başlangıçta çalıştır
-	}
+	res := &ServiceResource{CanonicalID: cfg.ID, State: "started", Enabled: true}
 	if err := decodeConfig(cfg.Parameters, res); err != nil {
 		return nil, err
 	}
@@ -99,9 +90,7 @@ func newServiceResource(cfg config.ResourceConfig) (Resource, error) {
 }
 
 func newGitResource(cfg config.ResourceConfig) (Resource, error) {
-	res := &GitResource{
-		CanonicalID: cfg.ID,
-	}
+	res := &GitResource{CanonicalID: cfg.ID}
 	if err := decodeConfig(cfg.Parameters, res); err != nil {
 		return nil, err
 	}
@@ -109,10 +98,7 @@ func newGitResource(cfg config.ResourceConfig) (Resource, error) {
 }
 
 func newSymlinkResource(cfg config.ResourceConfig) (Resource, error) {
-	res := &SymlinkResource{
-		CanonicalID: cfg.ID,
-		Force:       false,
-	}
+	res := &SymlinkResource{CanonicalID: cfg.ID, Force: false}
 	if err := decodeConfig(cfg.Parameters, res); err != nil {
 		return nil, err
 	}
@@ -120,11 +106,33 @@ func newSymlinkResource(cfg config.ResourceConfig) (Resource, error) {
 }
 
 func newContainerResource(cfg config.ResourceConfig) (Resource, error) {
-	res := &ContainerResource{
-		CanonicalID: cfg.ID,
-		State:       "running",
+	res := &ContainerResource{CanonicalID: cfg.ID, State: "running"}
+	if err := decodeConfig(cfg.Parameters, res); err != nil {
+		return nil, err
 	}
-	// mapstructure, []interface{} -> []string dönüşümünü otomatik yapar
+	return res, nil
+}
+
+// --- Yeni Eklenen Factory'ler ---
+
+func newDownloadResource(cfg config.ResourceConfig) (Resource, error) {
+	res := &DownloadResource{CanonicalID: cfg.ID, Mode: "0644"}
+	if err := decodeConfig(cfg.Parameters, res); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+func newUserResource(cfg config.ResourceConfig) (Resource, error) {
+	res := &UserResource{CanonicalID: cfg.ID, System: false}
+	if err := decodeConfig(cfg.Parameters, res); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+func newLineInFileResource(cfg config.ResourceConfig) (Resource, error) {
+	res := &LineInFileResource{CanonicalID: cfg.ID}
 	if err := decodeConfig(cfg.Parameters, res); err != nil {
 		return nil, err
 	}
