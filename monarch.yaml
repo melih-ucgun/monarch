@@ -1,12 +1,103 @@
+# Monarch Örnek Konfigürasyonu (CachyOS + Hyprland)
+
+# Global değişkenler (Template kaynağı bunları kullanır)
 vars:
-  user: "melih"
-  alias_name: "ll"
-  managed_by: "Monarch 🏰"
+  username: "melih"
+  monitor_primary: "eDP-1"
+  monitor_res: "1920x1080@60"
+  font_main: "JetBrainsMono Nerd Font"
+  theme_color: "0xffa6e3a1"
 
 resources:
-  - name: "my-web-app"
-    type: "container"
-    image: "nginx:latest"
-    state: "running"
-    ports:
-      - "8080:80"
+  # ---------------------------------------------------------
+  # 1. GRUP YÖNETİMİ (Group Resource)
+  # ---------------------------------------------------------
+  - id: create-docker-group
+    type: group
+    parameters:
+      name: docker
+      system: false
+
+  # ---------------------------------------------------------
+  # 2. KULLANICI YÖNETİMİ (User Resource)
+  # ---------------------------------------------------------
+  - id: configure-user
+    type: user
+    # create-docker-group çalışmadan bu çalışmasın (sıralama önemli)
+    # Monarch otomatik sıralama yapmıyorsa YAML sırası veya 'depends_on' gerekebilir.
+    parameters:
+      name: melih
+      shell: /bin/zsh
+      groups:
+        - wheel
+        - video
+        - audio
+        - docker # Yukarıda oluşturulan grup
+
+  # ---------------------------------------------------------
+  # 3. PAKET KURULUMLARI (Package Resource)
+  # ---------------------------------------------------------
+
+  # Sistem Paketleri (Pacman)
+  - id: install-base-tools
+    type: package
+    parameters:
+      name: git
+      manager: pacman
+      state: installed
+
+  # AUR Paketleri (Paru) - Hyprland için
+  - id: install-hyprland-git
+    type: package
+    parameters:
+      name: hyprland-git
+      manager: paru
+      state: installed
+
+  # Flatpak Uygulamaları
+  - id: install-spotify
+    type: package
+    parameters:
+      name: com.spotify.Client
+      manager: flatpak
+      state: installed
+
+  # ---------------------------------------------------------
+  # 4. DOSYA İNDİRME (Download Resource)
+  # ---------------------------------------------------------
+  - id: download-font
+    type: download
+    parameters:
+      url: "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/JetBrainsMono.zip"
+      dest: "/tmp/JetBrainsMono.zip"
+      mode: "0644"
+
+  # İndirilen fontu açmak için Exec kullanılabilir
+  - id: unzip-font
+    type: exec
+    parameters:
+      command: "unzip -o /tmp/JetBrainsMono.zip -d ~/.local/share/fonts && fc-cache -fv"
+      unless: "ls ~/.local/share/fonts/JetBrainsMonoNerdFont-Regular.ttf"
+
+  # ---------------------------------------------------------
+  # 5. DOSYA DÜZENLEME (LineInFile Resource)
+  # ---------------------------------------------------------
+  - id: enable-pacman-color
+    type: line_in_file
+    parameters:
+      path: "/etc/pacman.conf"
+      regexp: "^#Color" # Başında # olan Color satırını bul
+      line: "Color" # Bu hale getir (Yorumu kaldır)
+
+  # ---------------------------------------------------------
+  # 6. ŞABLON YÖNETİMİ (Template Resource)
+  # ---------------------------------------------------------
+  # Hyprland config dosyasını dinamik oluştur
+  - id: config-hyprland
+    type: template
+    parameters:
+      src: "./templates/hyprland.conf.tmpl" # Projendeki şablon dosyası
+      dest: "/home/melih/.config/hypr/hyprland.conf"
+      mode: "0644"
+    # Not: Bu kaynak otomatik olarak üstteki 'vars' bloğunu kullanır.
+    # Şablon içinde {{ .monitor_primary }} yazarsan "eDP-1" olarak çıkar.
