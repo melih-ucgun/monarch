@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
 	"github.com/melih-ucgun/monarch/internal/config"
@@ -39,40 +41,56 @@ func init() {
 }
 
 func runApply(configFile string, isDryRun bool) error {
-	fmt.Printf("🚀 Starting Monarch Apply (DryRun: %v)...\n", isDryRun)
+	// Header
+	pterm.DefaultHeader.WithFullWidth().WithBackgroundStyle(pterm.NewStyle(pterm.BgLightBlue)).
+		WithTextStyle(pterm.NewStyle(pterm.FgBlack, pterm.Bold)).
+		Println("Monarch Config Manager")
+
+	if isDryRun {
+		pterm.ThemeDefault.SecondaryStyle.Println("Running in DRY-RUN mode")
+	}
 
 	// 1. Sistemi Tespit Et
 	ctx := system.Detect(isDryRun)
-	fmt.Printf("🔍 Detected System: %s (%s) | User: %s\n", ctx.Distro, ctx.OS, ctx.User)
+
+	// System Info Box
+	sysInfo := [][]string{
+		{"OS", ctx.OS},
+		{"Distro", ctx.Distro},
+		{"User", ctx.User},
+		{"Time", time.Now().Format(time.RFC822)},
+	}
+	pterm.DefaultTable.WithHasHeader(false).WithData(sysInfo).Render()
+	pterm.Println()
 
 	// 2. State Yöneticisini Başlat
-	// Kullanıcının ev dizininde veya proje dizininde .monarch/state.json tutabiliriz.
-	// Şimdilik çalışma dizininde tutalım.
 	statePath := filepath.Join(".monarch", "state.json")
 	stateMgr, err := state.NewManager(statePath)
 	if err != nil {
-		fmt.Printf("⚠️ Could not initialize state manager: %v\n", err)
-		// State olmadan da çalışabilir ama uyaralım
+		pterm.Warning.Printf("Could not initialize state manager: %v\n", err)
 	}
 
 	// 3. Konfigürasyonu Yükle
+	spinnerLoad, _ := pterm.DefaultSpinner.Start("Loading configuration...")
 	cfg, err := config.LoadConfig(configFile)
 	if err != nil {
-		fmt.Printf("❌ Error loading config file '%s': %v\n", configFile, err)
+		spinnerLoad.Fail(fmt.Sprintf("Error loading config file '%s': %v", configFile, err))
 		return err
 	}
+	spinnerLoad.Success("Configuration loaded")
 
 	// 4. Kaynakları Sırala
+	spinnerSort, _ := pterm.DefaultSpinner.Start("Resolving dependencies...")
 	sortedResources, err := config.SortResources(cfg.Resources)
 	if err != nil {
-		fmt.Printf("❌ Error sorting resources: %v\n", err)
+		spinnerSort.Fail(fmt.Sprintf("Error sorting resources: %v", err))
 		return err
 	}
+	spinnerSort.Success(fmt.Sprintf("Resolved %d layers", len(sortedResources)))
+	pterm.Println()
 
-	// 5. Motoru (Engine) Hazırla (State Manager Enjekte Edildi)
+	// 5. Motoru (Engine) Hazırla
 	eng := core.NewEngine(ctx, stateMgr)
-
-	fmt.Printf("📦 Processing %d layers...\n", len(sortedResources))
 
 	// 6. Motoru Ateşle
 	createFn := func(t, n string, p map[string]interface{}, c *core.SystemContext) (core.ApplyableResource, error) {
@@ -80,7 +98,10 @@ func runApply(configFile string, isDryRun bool) error {
 	}
 
 	for i, layer := range sortedResources {
-		fmt.Printf("🔄 Layer %d:\n", i)
+		// Layer Header
+		pterm.DefaultSection.Printf("Phase %d: Processing %d resources", i+1, len(layer))
+
+		// Resources...
 		var layerItems []core.ConfigItem
 		for _, res := range layer {
 			name := res.Name
@@ -106,12 +127,18 @@ func runApply(configFile string, isDryRun bool) error {
 			})
 		}
 
+		// Spinner for execution (Simple main spinner)
+		spinnerExec, _ := pterm.DefaultSpinner.Start("Executing layer...")
+
 		if err := eng.RunParallel(layerItems, createFn); err != nil {
-			fmt.Printf("\n⚠️ Layer %d completed with errors: %v\n", i, err)
+			spinnerExec.Fail(fmt.Sprintf("Layer %d failed", i+1))
+			pterm.Error.Printf("Layer %d completed with errors: %v\n", i+1, err)
 			return err
 		}
+		spinnerExec.Success(fmt.Sprintf("Layer %d complete", i+1))
 	}
 
-	fmt.Println("\n✨ Configuration applied successfully!")
+	pterm.Println()
+	pterm.DefaultBasicText.WithStyle(pterm.NewStyle(pterm.FgGreen, pterm.Bold)).Println("✨ Configuration applied successfully!")
 	return nil
 }

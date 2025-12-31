@@ -3,6 +3,8 @@ package core
 import (
 	"fmt"
 	"sync"
+
+	"github.com/pterm/pterm"
 )
 
 // StateUpdater interface'i, Engine'in state paketine doğrudan bağımlı olmamasını sağlar.
@@ -124,12 +126,14 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 			result, err := res.Apply(e.Context)
 
 			status := "success"
+
 			if err != nil {
 				status = "failed"
 				errChan <- err
-				fmt.Printf("❌ [%s] Failed: %v\n", it.Name, err)
+				pterm.Error.Printf("[%s] %s: Failed: %v\n", it.Type, it.Name, err)
 			} else if result.Changed {
-				fmt.Printf("✅ [%s] %s\n", it.Name, result.Message)
+				// Success
+				pterm.Success.Printf("[%s] %s: %s\n", it.Type, it.Name, result.Message)
 
 				// Başarılı değişiklikleri kaydet (Rollback için)
 				if !e.Context.DryRun {
@@ -138,7 +142,10 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 					mu.Unlock()
 				}
 			} else {
-				fmt.Printf("ℹ️  [%s] OK\n", it.Name)
+				// No Change (Info or Skipped)
+				// pterm.Info veya pterm.Debug (kullanıcı isterse)
+				// Şimdilik gri (Gray) veya Info.
+				pterm.Info.Printf("[%s] %s: OK\n", it.Type, it.Name)
 			}
 
 			// 3. Durumu Kaydet
@@ -160,14 +167,15 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 	if errCount > 0 {
 		// Rollback Tetikle
 		if !e.Context.DryRun {
-			fmt.Printf("\n🚨 Error occurred. Initiating Rollback...\n")
+			pterm.Println()
+			pterm.Error.Println("Error occurred. Initiating Rollback...")
 
 			// 1. Önce şu anki katmanda başarılı olmuş (ancak diğerlerinin hatası yüzünden yarım kalmış) işlemleri geri al
-			fmt.Printf("Visualizing Rollback for current layer (%d resources)...\n", len(updatedResources))
+			pterm.Warning.Printf("Visualizing Rollback for current layer (%d resources)...\n", len(updatedResources))
 			e.rollback(updatedResources)
 
 			// 2. Önceki katmanlarda tamamlanmış işlemleri geri al
-			fmt.Printf("Visualizing Rollback for previous layers (%d resources)...\n", len(e.AppliedHistory))
+			pterm.Warning.Printf("Visualizing Rollback for previous layers (%d resources)...\n", len(e.AppliedHistory))
 			e.rollback(e.AppliedHistory)
 		}
 		return fmt.Errorf("encountered %d errors in parallel layer execution", errCount)
@@ -189,14 +197,14 @@ func (e *Engine) rollback(resources []ApplyableResource) {
 	for i := len(resources) - 1; i >= 0; i-- {
 		res := resources[i]
 		if rev, ok := res.(Revertable); ok {
-			fmt.Printf("Visualizing Rollback for %s...\n", res.GetName())
+			pterm.Warning.Printf("Visualizing Rollback for %s...\n", res.GetName())
 			if err := rev.Revert(e.Context); err != nil {
-				fmt.Printf("❌ Failed to revert %s: %v\n", res.GetName(), err)
+				pterm.Error.Printf("Failed to revert %s: %v\n", res.GetName(), err)
 				if !e.Context.DryRun && e.StateUpdater != nil {
 					_ = e.StateUpdater.UpdateResource(res.GetType(), res.GetName(), "any", "revert_failed")
 				}
 			} else {
-				fmt.Printf("↺ Reverted %s\n", res.GetName())
+				pterm.Success.Printf("Reverted %s\n", res.GetName())
 				if !e.Context.DryRun && e.StateUpdater != nil {
 					// Başarılı revert, 'reverted' olarak işaretle
 					_ = e.StateUpdater.UpdateResource(res.GetType(), res.GetName(), "any", "reverted")
