@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/melih-ucgun/monarch/internal/core"
+	"github.com/melih-ucgun/veto/internal/core"
 )
 
 type TemplateAdapter struct {

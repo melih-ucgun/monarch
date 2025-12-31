@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/melih-ucgun/monarch/internal/state"
+	"github.com/melih-ucgun/veto/internal/state"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )

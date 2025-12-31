@@ -7,7 +7,7 @@ import (
 )
 
 // SystemContext, uygulamanın çalışma anındaki bağlamını (context) tutar.
-// Standart Go "context" paketini sarmalar ve Monarch'a özel alanlar ekler.
+// Standart Go "context" paketini sarmalar ve Veto'a özel alanlar ekler.
 type SystemContext struct {
 	context.Context
 

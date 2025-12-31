@@ -9,7 +9,7 @@ import (
 
 	"github.com/pterm/pterm"
 
-	"github.com/melih-ucgun/monarch/internal/core"
+	"github.com/melih-ucgun/veto/internal/core"
 )
 
 type GitAdapter struct {

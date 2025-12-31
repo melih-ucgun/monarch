@@ -9,7 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config represents the root structure of monarch.yaml.
+// Config represents the root structure of veto.yaml.
 type Config struct {
 	Vars      map[string]string `yaml:"vars"`      // Global variables
 	Includes  []string          `yaml:"includes"`  // Other config files to include

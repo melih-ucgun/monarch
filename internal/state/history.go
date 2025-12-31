@@ -34,7 +34,7 @@ type HistoryManager struct {
 func NewHistoryManager(baseDir string) *HistoryManager {
 	if baseDir == "" {
 		home, _ := os.UserHomeDir()
-		baseDir = filepath.Join(home, ".monarch")
+		baseDir = filepath.Join(home, ".veto")
 	}
 	return &HistoryManager{
 		HistoryFile: filepath.Join(baseDir, "history.json"),

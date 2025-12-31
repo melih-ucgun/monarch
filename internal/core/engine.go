@@ -7,8 +7,8 @@ import (
 
 	"github.com/pterm/pterm"
 
-	"github.com/melih-ucgun/monarch/internal/config"
-	"github.com/melih-ucgun/monarch/internal/state"
+	"github.com/melih-ucgun/veto/internal/config"
+	"github.com/melih-ucgun/veto/internal/state"
 )
 
 // StateUpdater interface allows Engine to be independent of the state package.

@@ -13,11 +13,11 @@ var interval int
 var watchCmd = &cobra.Command{
 	Use:   "watch [config_file]",
 	Short: "Watch for changes in the configuration file and apply automatically",
-	Long: `Monitors the specified configuration file (default: monarch.yaml) for changes.
+	Long: `Monitors the specified configuration file (default: veto.yaml) for changes.
 When a change is detected, it automatically runs 'apply'.
 Polls the file system every few seconds (configurable).`,
 	Run: func(cmd *cobra.Command, args []string) {
-		configFile := "monarch.yaml"
+		configFile := "veto.yaml"
 		if len(args) > 0 {
 			configFile = args[0]
 		}

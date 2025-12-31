@@ -1,6 +1,6 @@
 package main
 
-import "github.com/melih-ucgun/monarch/cmd"
+import "github.com/melih-ucgun/veto/cmd"
 
 func main() {
 	cmd.Execute()

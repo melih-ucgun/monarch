@@ -8,9 +8,9 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "monarch",
-	Short: "Your System, Your Rules. Enforced by Monarch.",
-	Long:  `Monarch is a declarative, agentless configuration management tool.`,
+	Use:   "veto",
+	Short: "Your System, Your Rules. Enforced by Veto.",
+	Long:  `Veto is a declarative, agentless configuration management tool.`,
 }
 
 func Execute() error {
@@ -24,5 +24,5 @@ func init() {
 	})
 	slog.SetDefault(slog.New(handler))
 
-	rootCmd.PersistentFlags().StringP("config", "c", "monarch.yaml", "config file path")
+	rootCmd.PersistentFlags().StringP("config", "c", "veto.yaml", "config file path")
 }

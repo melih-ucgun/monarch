@@ -7,9 +7,9 @@ import (
 
 	"sort"
 
-	"github.com/melih-ucgun/monarch/internal/config"
-	"github.com/melih-ucgun/monarch/internal/discovery"
-	"github.com/melih-ucgun/monarch/internal/system"
+	"github.com/melih-ucgun/veto/internal/config"
+	"github.com/melih-ucgun/veto/internal/discovery"
+	"github.com/melih-ucgun/veto/internal/system"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -18,7 +18,7 @@ import (
 var importCmd = &cobra.Command{
 	Use:   "import [output_file]",
 	Short: "Discover installed packages and services",
-	Long:  `Scans the system for explicitly installed packages and enabled services, and generates a Monarch configuration file.`,
+	Long:  `Scans the system for explicitly installed packages and enabled services, and generates a Veto configuration file.`,
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		outputFile := "imported_system.yaml"
@@ -208,7 +208,7 @@ var importCmd = &cobra.Command{
 		}
 
 		pterm.Success.Printf("Configuration saved to %s (%d resources)\n", outputFile, len(cfg.Resources))
-		pterm.Info.Println("Review this file before running 'monarch apply'!")
+		pterm.Info.Println("Review this file before running 'veto apply'!")
 	},
 }
 

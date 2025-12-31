@@ -6,14 +6,14 @@ import (
 	"path/filepath"
 )
 
-// HubClient interacts with the Monarch Registry (or mocks it)
+// HubClient interacts with the Veto Registry (or mocks it)
 type HubClient struct {
 	BaseURL string
 }
 
 func NewHubClient() *HubClient {
 	return &HubClient{
-		BaseURL: "https://hub.monarch.dev/api/v1", // Mock URL
+		BaseURL: "https://hub.veto.dev/api/v1", // Mock URL
 	}
 }
 
@@ -48,7 +48,7 @@ func (c *HubClient) Install(rulesetName, destDir string) error {
 		return err
 	}
 
-	content := fmt.Sprintf("# RuleSet: %s\n# Downloaded from Monarch Hub\nresources:\n", rulesetName)
+	content := fmt.Sprintf("# RuleSet: %s\n# Downloaded from Veto Hub\nresources:\n", rulesetName)
 
 	// Create a dummy resource based on name for demo purposes
 	if rulesetName == "docker" {

@@ -3,14 +3,14 @@ package resource
 import (
 	"fmt"
 
-	"github.com/melih-ucgun/monarch/internal/adapters/bundle"
-	"github.com/melih-ucgun/monarch/internal/adapters/file"
-	"github.com/melih-ucgun/monarch/internal/adapters/git"
-	"github.com/melih-ucgun/monarch/internal/adapters/identity"
-	"github.com/melih-ucgun/monarch/internal/adapters/pkg"
-	"github.com/melih-ucgun/monarch/internal/adapters/service"
-	"github.com/melih-ucgun/monarch/internal/adapters/shell"
-	"github.com/melih-ucgun/monarch/internal/core"
+	"github.com/melih-ucgun/veto/internal/adapters/bundle"
+	"github.com/melih-ucgun/veto/internal/adapters/file"
+	"github.com/melih-ucgun/veto/internal/adapters/git"
+	"github.com/melih-ucgun/veto/internal/adapters/identity"
+	"github.com/melih-ucgun/veto/internal/adapters/pkg"
+	"github.com/melih-ucgun/veto/internal/adapters/service"
+	"github.com/melih-ucgun/veto/internal/adapters/shell"
+	"github.com/melih-ucgun/veto/internal/core"
 )
 
 // Deprecated fonksiyon placeholder

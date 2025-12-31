@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/melih-ucgun/monarch/internal/crypto"
+	"github.com/melih-ucgun/veto/internal/crypto"
 	"github.com/spf13/cobra"
 )
 

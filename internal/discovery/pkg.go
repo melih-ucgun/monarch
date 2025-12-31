@@ -5,7 +5,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/melih-ucgun/monarch/internal/core"
+	"github.com/melih-ucgun/veto/internal/core"
 )
 
 func discoverPackages(ctx *core.SystemContext) ([]string, error) {

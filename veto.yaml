@@ -1,0 +1,10 @@
+resources:
+  - id: template-test
+    type: file
+    params:
+      name: template-test
+      path: /tmp/veto-template
+      content: |
+        Hello {{ .User }}!
+        You are running on {{ .Distro }} ({{ .FS.RootFSType }}).
+        Your CPU is {{ .Hardware.CPUModel }}.

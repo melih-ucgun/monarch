@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/melih-ucgun/monarch/internal/core"
+	"github.com/melih-ucgun/veto/internal/core"
 )
 
 // Detect, mevcut sistemi analiz eder ve bir SystemContext doldurur.

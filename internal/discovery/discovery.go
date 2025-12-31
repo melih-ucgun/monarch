@@ -3,8 +3,8 @@ package discovery
 import (
 	"fmt"
 
-	"github.com/melih-ucgun/monarch/internal/config"
-	"github.com/melih-ucgun/monarch/internal/core"
+	"github.com/melih-ucgun/veto/internal/config"
+	"github.com/melih-ucgun/veto/internal/core"
 )
 
 // DiscoverPackages scans for packages

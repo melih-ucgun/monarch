@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/melih-ucgun/monarch/internal/hub"
+	"github.com/melih-ucgun/veto/internal/hub"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
@@ -9,7 +9,7 @@ import (
 var recipeCmd = &cobra.Command{
 	Use:   "recipe",
 	Short: "Manage configuration recipes",
-	Long:  `Manage multiple Monarch configuration recipes (e.g., work, personal). Each recipe contains a system.yaml and a rulesets directory.`,
+	Long:  `Manage multiple Veto configuration recipes (e.g., work, personal). Each recipe contains a system.yaml and a rulesets directory.`,
 }
 
 var recipeListCmd = &cobra.Command{
@@ -27,7 +27,7 @@ var recipeListCmd = &cobra.Command{
 
 		pterm.DefaultHeader.Println("Available Recipes")
 		if len(recipes) == 0 {
-			pterm.Info.Println("No recipes found. Create one with 'monarch recipe create <name>'")
+			pterm.Info.Println("No recipes found. Create one with 'veto recipe create <name>'")
 			return
 		}
 
@@ -58,7 +58,7 @@ var recipeCreateCmd = &cobra.Command{
 		}
 		pterm.Success.Printf("Recipe '%s' created successfully.\n", name)
 		pterm.Info.Printf("Recipe path: %s/recipes/%s\n", mgr.BaseDir, name)
-		pterm.Info.Println("Use 'monarch recipe use <name>' to activate it.")
+		pterm.Info.Println("Use 'veto recipe use <name>' to activate it.")
 	},
 }
 

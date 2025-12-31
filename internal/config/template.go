@@ -9,7 +9,7 @@ import (
 // data genellikle *core.SystemContext olacaktır.
 func ExecuteTemplate(content string, data interface{}) (string, error) {
 	// "MissingKeyError" ile, olmayan bir değişken kullanılırsa hata vermesini sağlıyoruz.
-	tmpl, err := template.New("monarch").Option("missingkey=error").Parse(content)
+	tmpl, err := template.New("veto").Option("missingkey=error").Parse(content)
 	if err != nil {
 		return "", err
 	}

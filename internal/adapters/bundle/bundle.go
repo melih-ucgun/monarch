@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/melih-ucgun/monarch/internal/core"
+	"github.com/melih-ucgun/veto/internal/core"
 )
 
 // ResourceCreator is a function type to break dependency cycle.

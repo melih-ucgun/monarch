@@ -4,15 +4,15 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/melih-ucgun/monarch/internal/hub"
+	"github.com/melih-ucgun/veto/internal/hub"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
 
 var hubCmd = &cobra.Command{
 	Use:   "hub",
-	Short: "Interact with Monarch Hub",
-	Long:  `Search, install, and manage RuleSets from Monarch Hub.`,
+	Short: "Interact with Veto Hub",
+	Long:  `Search, install, and manage RuleSets from Veto Hub.`,
 }
 
 var hubSearchCmd = &cobra.Command{

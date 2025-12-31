@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/melih-ucgun/monarch/internal/config"
+	"github.com/melih-ucgun/veto/internal/config"
 )
 
 func TestNewSSHTransport(t *testing.T) {

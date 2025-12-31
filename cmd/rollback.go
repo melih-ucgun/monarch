@@ -5,8 +5,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/melih-ucgun/monarch/internal/state"
-	"github.com/melih-ucgun/monarch/internal/system"
+	"github.com/melih-ucgun/veto/internal/state"
+	"github.com/melih-ucgun/veto/internal/system"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )

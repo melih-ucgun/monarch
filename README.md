@@ -1,22 +1,22 @@
-# 👑 Monarch
+# 👑 Veto
 
 > **The Sovereign System Orchestrator** > _"Don't just manage your OS. Rule it."_
 
-**Monarch** transforms Linux system management from a chaotic, irreversible process into a **modular, self-healing Lego experience**. It treats your system not as a monolithic entity, but as a collection of attachable and detachable **Profiles**.
+**Veto** transforms Linux system management from a chaotic, irreversible process into a **modular, self-healing Lego experience**. It treats your system not as a monolithic entity, but as a collection of attachable and detachable **Profiles**.
 
-Whether you are running a minimal **CachyOS** setup with Hyprland or a full-blown server fleet, Monarch gives you the power of immutable systems with the flexibility of a rolling release.
+Whether you are running a minimal **CachyOS** setup with Hyprland or a full-blown server fleet, Veto gives you the power of immutable systems with the flexibility of a rolling release.
 
 ## ⚡ The Problem
 
 Modern Linux setups are fragmented. You install a package with `pacman`, manage configs with `stow`, enable services with `systemctl`, and fix permissions manually. **One change makes the system "dirty," and undoing it becomes nearly impossible.**
 
-## 🆚 Monarch vs. The Ecosystem
+## 🆚 Veto vs. The Ecosystem
 
 Why build a new tool? Because existing solutions force you to choose between **flexibility** and **stability**.
 
 |   |   |   |   |   |
 |---|---|---|---|---|
-|**Feature**|**👑 Monarch**|**❄️ NixOS**|**🐍 Ansible**|**📂 Chezmoi / Stow**|
+|**Feature**|**👑 Veto**|**❄️ NixOS**|**🐍 Ansible**|**📂 Chezmoi / Stow**|
 |**Primary Goal**|Modular Desktop Orchestration|Reproducible OS|Server Configuration|Dotfile Management|
 |**"Undo" Button**|✅ **Native** (Atomic Revert)|⚠️ Rollback (Whole OS)|❌ Manual Playbooks|❌ None|
 |**OS Requirement**|Any (Arch/Cachy, Fedora, etc.)|Must use NixOS|Any|Any|
@@ -30,7 +30,7 @@ Why build a new tool? Because existing solutions force you to choose between **f
 >     
 > - **Use Ansible** if you are managing 1000 servers and don't care about "undoing" changes on a laptop.
 >     
-> - **Use Monarch** if you want the stability of NixOS on your favorite distro (like CachyOS) with the ease of use of a Lego set.
+> - **Use Veto** if you want the stability of NixOS on your favorite distro (like CachyOS) with the ease of use of a Lego set.
 >     
 
 ## 🚀 Key Features
@@ -40,7 +40,7 @@ Why build a new tool? Because existing solutions force you to choose between **f
 Define your entire system personality in a single, human-readable YAML file. Switch between "Work Mode", "Gaming Mode", or "Minimal Mode" in seconds.
 
 ```
-# ~/.config/monarch/profiles/workstation.yaml
+# ~/.config/veto/profiles/workstation.yaml
 name: "Dev Workstation"
 description: "High performance setup for Go & Rust dev"
 rulesets:
@@ -54,27 +54,27 @@ self_healing:
 
 ### 2. Context-Aware Intelligence
 
-Monarch doesn't blindly run scripts. It analyzes the host first.
+Veto doesn't blindly run scripts. It analyzes the host first.
 
-> _Example:_ If you apply a gaming profile on a **Ryzen 7 7730u** laptop, Monarch intelligently selects `mesa` and `vulkan-radeon` instead of forcing NVIDIA drivers.
+> _Example:_ If you apply a gaming profile on a **Ryzen 7 7730u** laptop, Veto intelligently selects `mesa` and `vulkan-radeon` instead of forcing NVIDIA drivers.
 
 ### 3. True Undo Capability
 
-Most package managers remove the binary but leave the chaos. Monarch tracks every file created, every permission changed, and every service enabled.
+Most package managers remove the binary but leave the chaos. Veto tracks every file created, every permission changed, and every service enabled.
 
 ```
-monarch profile disable gaming
+veto profile disable gaming
 # Result: System returns to the exact state before the profile was applied.
 ```
 
 ## 📦 Installation & Quick Start
 
-Monarch is a single binary written in Go. No dependencies required.
+Veto is a single binary written in Go. No dependencies required.
 
 ### 1. Install
 
 ```
-curl -L [https://monarch.sh/install](https://monarch.sh/install) | sudo bash
+curl -L [https://veto.sh/install](https://veto.sh/install) | sudo bash
 ```
 
 ### 2. Initialize (System Detection)
@@ -82,7 +82,7 @@ curl -L [https://monarch.sh/install](https://monarch.sh/install) | sudo bash
 This step scans your hardware (CPU, GPU) and OS (e.g., CachyOS, Arch, Fedora) to configure the local registry.
 
 ```
-monarch init
+veto init
 ```
 
 ### 3. Search & Apply
@@ -91,11 +91,11 @@ Find what you need in the Hub and apply it.
 
 ```
 # Find a window manager setup
-monarch hub search hyprland
+veto hub search hyprland
 
 # Apply a pre-made profile (Dry run first!)
-monarch profile apply minimal-desktop --dry-run
-monarch profile apply minimal-desktop
+veto profile apply minimal-desktop --dry-run
+veto profile apply minimal-desktop
 ```
 
 ## 🎮 Real-World Scenarios
@@ -110,15 +110,15 @@ Goal: A clean, keyboard-driven development environment.
 
 ```
 # 1. Create a fresh profile
-monarch profile create dev-laptop
+veto profile create dev-laptop
 
-# 2. Add rulesets (Monarch auto-detects AMD GPU context)
-monarch profile add ruleset dev-laptop official:hyprland
-monarch profile add ruleset dev-laptop community:waybar-custom
-monarch profile add ruleset dev-laptop community:rofi-lbonn
+# 2. Add rulesets (Veto auto-detects AMD GPU context)
+veto profile add ruleset dev-laptop official:hyprland
+veto profile add ruleset dev-laptop community:waybar-custom
+veto profile add ruleset dev-laptop community:rofi-lbonn
 
 # 3. Apply
-monarch profile apply dev-laptop
+veto profile apply dev-laptop
 ```
 
 _Result: A fully configured Hyprland environment with Waybar and Rofi, optimized for AMD integrated graphics._
@@ -129,17 +129,17 @@ _Result: A fully configured Hyprland environment with Waybar and Rofi, optimized
 
 ```
 # Friday Night:
-monarch profile apply hardcore-gaming
+veto profile apply hardcore-gaming
 
 # Monday Morning:
-monarch profile disable hardcore-gaming
+veto profile disable hardcore-gaming
 ```
 
 _Result: Steam, Wine, Proton, and 20GB of dependencies are gone. No residual config files. No background services._
 
 ## 🏗️ Architecture
 
-Monarch is built on the **Holy Trinity** of modern system orchestration:
+Veto is built on the **Holy Trinity** of modern system orchestration:
 
 1. **The Engine (CLI):** * Written in **Go**.
     
@@ -166,11 +166,11 @@ Monarch is built on the **Holy Trinity** of modern system orchestration:
 |**1**|✅|**Core Engine:** Resource adapters, State management, Undo logic.|
 |**1.5**|🚧|**System Awareness:** Auto-detection of Hardware/OS, Profile Sync.|
 |**2**|⏳|**Hub Ecosystem:** Compatibility Scoring, Community Repository.|
-|**3**|🔮|**Monarch Studio:** GUI Dashboard & Visual Builder.|
+|**3**|🔮|**Veto Studio:** GUI Dashboard & Visual Builder.|
 
 ## 🤝 Contributing
 
-Monarch is designed to be community-driven.
+Veto is designed to be community-driven.
 
 - **Rule Creators:** Submit your custom Hyprland configs or Dev environments as Rulesets.
     
@@ -192,4 +192,4 @@ Monarch is designed to be community-driven.
 
 Distributed under the Apache 2.0 License. See `LICENSE` for more information.
 
-**Monarch** © 2025 Developed by **Melih Uçgun** _"We don't just configure systems—we build sovereign infrastructure."_
+**Veto** © 2025 Developed by **Melih Uçgun** _"We don't just configure systems—we build sovereign infrastructure."_

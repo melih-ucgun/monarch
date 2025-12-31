@@ -16,7 +16,7 @@ type RecipeManager struct {
 func NewRecipeManager(baseDir string) *RecipeManager {
 	if baseDir == "" {
 		home, _ := os.UserHomeDir()
-		baseDir = filepath.Join(home, ".monarch")
+		baseDir = filepath.Join(home, ".veto")
 	}
 	return &RecipeManager{
 		BaseDir:    baseDir,
@@ -31,7 +31,7 @@ func (m *RecipeManager) EnsureDirs() error {
 }
 
 // Create creates a new recipe directory structure
-// Standard Monarch Recipe Structure:
+// Standard Veto Recipe Structure:
 // my-recipe/
 // ├── system.yaml
 // └── rulesets/ (directory for downloaded rulesets)

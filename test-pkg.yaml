@@ -1,4 +1,4 @@
 resources:
   - type: package
-    name: monarch-fake-package-123
+    name: veto-fake-package-123
     state: present

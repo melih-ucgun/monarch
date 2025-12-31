@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 
 	"atomicgo.dev/cursor"
-	"github.com/melih-ucgun/monarch/internal/core"
-	"github.com/melih-ucgun/monarch/internal/system"
+	"github.com/melih-ucgun/veto/internal/core"
+	"github.com/melih-ucgun/veto/internal/system"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -15,8 +15,8 @@ import (
 
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "Initialize Monarch system profile",
-	Long:  `Scans the current system and creates a '.monarch/system.yaml' profile used for context-aware operations.`,
+	Short: "Initialize Veto system profile",
+	Long:  `Scans the current system and creates a '.veto/system.yaml' profile used for context-aware operations.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		runInit()
 	},
@@ -29,7 +29,7 @@ func init() {
 func runInit() {
 	pterm.DefaultHeader.WithFullWidth().WithBackgroundStyle(pterm.NewStyle(pterm.BgMagenta)).
 		WithTextStyle(pterm.NewStyle(pterm.FgBlack, pterm.Bold)).
-		Println("Monarch System Initializer")
+		Println("Veto System Initializer")
 
 	spinner, _ := pterm.DefaultSpinner.Start("Scanning system...")
 	detectedCtx := system.Detect(false)
@@ -62,8 +62,8 @@ func runInit() {
 		os.Exit(1)
 	}
 
-	pterm.Success.Println("System profile saved to .monarch/system.yaml")
-	pterm.Info.Println("You can now run 'monarch apply' and it will use this context!")
+	pterm.Success.Println("System profile saved to .veto/system.yaml")
+	pterm.Info.Println("You can now run 'veto apply' and it will use this context!")
 }
 
 func displaySystemInfo(ctx *core.SystemContext) {
@@ -105,13 +105,13 @@ func ask(label, current string) string {
 }
 
 func saveSystemProfile(ctx *core.SystemContext) error {
-	// Create .monarch dir if not exists
-	monarchDir := ".monarch"
-	if err := os.MkdirAll(monarchDir, 0755); err != nil {
+	// Create .veto dir if not exists
+	vetoDir := ".veto"
+	if err := os.MkdirAll(vetoDir, 0755); err != nil {
 		return err
 	}
 
-	filePath := filepath.Join(monarchDir, "system.yaml")
+	filePath := filepath.Join(vetoDir, "system.yaml")
 	data, err := yaml.Marshal(ctx)
 	if err != nil {
 		return err

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/melih-ucgun/monarch/internal/core"
+	"github.com/melih-ucgun/veto/internal/core"
 )
 
 type GroupAdapter struct {

@@ -1,0 +1,25 @@
+resources:
+  # 1. Clone a fresh repo
+  - id: git-clone
+    type: git
+    parameters:
+      repo: https://github.com/octocat/Hello-World.git
+      dest: /tmp/veto-git-verify/hello
+      branch: master
+
+  # 2. Update an existing repo (Assumes pre-existing 'behind' state at /tmp/veto-git-verify/behind)
+  - id: git-update
+    type: git
+    parameters:
+      repo: https://github.com/octocat/Hello-World.git
+      dest: /tmp/veto-git-verify/behind
+      update: true
+      branch: master
+
+  # 3. Checkout specific commit
+  - id: git-commit
+    type: git
+    parameters:
+      repo: https://github.com/octocat/Hello-World.git
+      dest: /tmp/veto-git-verify/commit
+      commit: 7fd1a60b01f91b314f59955a4e4d4e80d8edf11d

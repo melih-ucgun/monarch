@@ -10,12 +10,12 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/melih-ucgun/monarch/internal/config"
-	"github.com/melih-ucgun/monarch/internal/core"
-	"github.com/melih-ucgun/monarch/internal/hub"
-	"github.com/melih-ucgun/monarch/internal/resource"
-	"github.com/melih-ucgun/monarch/internal/state" // New import
-	"github.com/melih-ucgun/monarch/internal/system"
+	"github.com/melih-ucgun/veto/internal/config"
+	"github.com/melih-ucgun/veto/internal/core"
+	"github.com/melih-ucgun/veto/internal/hub"
+	"github.com/melih-ucgun/veto/internal/resource"
+	"github.com/melih-ucgun/veto/internal/state" // New import
+	"github.com/melih-ucgun/veto/internal/system"
 )
 
 var dryRun bool
@@ -24,7 +24,7 @@ var applyCmd = &cobra.Command{
 	Use:   "apply [config_file]",
 	Short: "Apply the configuration to the system",
 	Long: `Reads the configuration file and ensures system state matches desired state.
-Updates .monarch/state.json with the results.`,
+Updates .veto/state.json with the results.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var configFile string
 		if len(args) > 0 {
@@ -63,7 +63,7 @@ func runApply(configFile string, isDryRun bool) error {
 	// Header
 	pterm.DefaultHeader.WithFullWidth().WithBackgroundStyle(pterm.NewStyle(pterm.BgLightBlue)).
 		WithTextStyle(pterm.NewStyle(pterm.FgBlack, pterm.Bold)).
-		Println("Monarch Config Manager")
+		Println("Veto Config Manager")
 
 	if isDryRun {
 		pterm.ThemeDefault.SecondaryStyle.Println("Running in DRY-RUN mode")
@@ -73,8 +73,8 @@ func runApply(configFile string, isDryRun bool) error {
 	ctx := system.Detect(isDryRun)
 
 	// 1.5 Load System Profile (if exists)
-	if data, err := os.ReadFile(".monarch/system.yaml"); err == nil {
-		pterm.Info.Println("Loading system profile from .monarch/system.yaml")
+	if data, err := os.ReadFile(".veto/system.yaml"); err == nil {
+		pterm.Info.Println("Loading system profile from .veto/system.yaml")
 		// Override detected context with saved profile
 		if err := yaml.Unmarshal(data, ctx); err != nil {
 			pterm.Warning.Printf("Failed to parse system profile: %v\n", err)
@@ -99,7 +99,7 @@ func runApply(configFile string, isDryRun bool) error {
 	pterm.Println()
 
 	// 2. Initialize State Manager
-	statePath := filepath.Join(".monarch", "state.json")
+	statePath := filepath.Join(".veto", "state.json")
 	stateMgr, err := state.NewManager(statePath)
 	if err != nil {
 		pterm.Warning.Printf("Could not initialize state manager: %v\n", err)

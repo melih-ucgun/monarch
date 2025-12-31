@@ -7,16 +7,16 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/melih-ucgun/monarch/internal/state"
+	"github.com/melih-ucgun/veto/internal/state"
 	"github.com/spf13/cobra"
 )
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show the current state of managed resources",
-	Long:  `Displays a list of resources managed by Monarch and their last known status from the state file.`,
+	Long:  `Displays a list of resources managed by Veto and their last known status from the state file.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		statePath := filepath.Join(".monarch", "state.json")
+		statePath := filepath.Join(".veto", "state.json")
 		mgr, err := state.NewManager(statePath)
 		if err != nil {
 			fmt.Printf("❌ Could not load state file: %v\n", err)
@@ -24,11 +24,11 @@ var statusCmd = &cobra.Command{
 		}
 
 		if len(mgr.Current.Resources) == 0 {
-			fmt.Println("No resources currently managed by Monarch.")
+			fmt.Println("No resources currently managed by Veto.")
 			return
 		}
 
-		fmt.Printf("📊 Monarch Status (Last Run: %s)\n\n", mgr.Current.LastRun.Format(time.RFC822))
+		fmt.Printf("📊 Veto Status (Last Run: %s)\n\n", mgr.Current.LastRun.Format(time.RFC822))
 
 		// Tablo formatında çıktı
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)

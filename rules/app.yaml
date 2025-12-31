@@ -3,6 +3,6 @@ resources:
     type: file
     depends_on: [base-git] # Dependency across files!
     parameters:
-      path: /tmp/monarch-mod-test/dep.txt
+      path: /tmp/veto-mod-test/dep.txt
       content: "I depend on base-git"
       state: present

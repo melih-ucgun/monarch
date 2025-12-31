@@ -20,9 +20,9 @@ var GlobalBackup *BackupManager
 
 // InitBackupManager, yedekleme dizinini hazırlar.
 func InitBackupManager() error {
-	// .monarch/backups/YYYYMMDD-HHMMSS formatında klasör oluştur
+	// .veto/backups/YYYYMMDD-HHMMSS formatında klasör oluştur
 	timestamp := time.Now().Format("20060102-150405")
-	backupDir := filepath.Join(".monarch", "backups", timestamp)
+	backupDir := filepath.Join(".veto", "backups", timestamp)
 
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
 		return fmt.Errorf("failed to create backup dir: %w", err)

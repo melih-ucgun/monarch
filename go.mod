@@ -1,4 +1,4 @@
-module github.com/melih-ucgun/monarch
+module github.com/melih-ucgun/veto
 
 go 1.25.5
 
