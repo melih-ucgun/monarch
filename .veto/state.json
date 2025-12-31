@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "last_run": "2025-12-31T20:11:25.967373517+03:00",
+  "last_run": "2025-12-31T21:58:44.707247558+03:00",
   "resources": {
     "download:download-font": {
       "id": "download:download-font",
@@ -116,6 +116,15 @@
       "type": "package",
       "state": "installed",
       "last_applied": "2025-12-31T13:17:45.923402412+03:00",
+      "status": "success",
+      "metadata": {}
+    },
+    "pkg:nano": {
+      "id": "pkg:nano",
+      "name": "nano",
+      "type": "pkg",
+      "state": "present",
+      "last_applied": "2025-12-31T21:58:44.707234634+03:00",
       "status": "success",
       "metadata": {}
     },

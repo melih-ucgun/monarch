@@ -1,4 +1,6 @@
+# test-nano.yaml
 resources:
-  - type: package
-    name: veto-fake-package-123
+  - id: install-nano
+    type: pkg
+    name: nano
     state: present
