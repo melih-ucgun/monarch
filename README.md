@@ -1,137 +1,195 @@
 # 👑 Monarch
 
-### The Sovereign System Orchestrator
+> **The Sovereign System Orchestrator** > _"Don't just manage your OS. Rule it."_
 
-**"Don't just manage your OS. Rule it."**
+**Monarch** transforms Linux system management from a chaotic, irreversible process into a **modular, self-healing Lego experience**. It treats your system not as a monolithic entity, but as a collection of attachable and detachable **Profiles**.
 
-Monarch is a next-generation orchestration tool that transforms Linux system management from a complex and fragile process into a modular, reversible, and declarative **Lego experience**.
+Whether you are running a minimal **CachyOS** setup with Hyprland or a full-blown server fleet, Monarch gives you the power of immutable systems with the flexibility of a rolling release.
 
-[Vision](https://www.google.com/search?q=%23-vision-invisible-os "null") • [How It Works](https://www.google.com/search?q=%23-key-features "null") • [Comparison](https://www.google.com/search?q=%23-why-monarch "null") • [Roadmap](https://www.google.com/search?q=%23-roadmap "null")
+## ⚡ The Problem
 
-## 🔮 Vision: "Invisible OS"
+Modern Linux setups are fragmented. You install a package with `pacman`, manage configs with `stow`, enable services with `systemctl`, and fix permissions manually. **One change makes the system "dirty," and undoing it becomes nearly impossible.**
 
-Setting up and maintaining a modern Linux environment (e.g., CachyOS + Hyprland) is chaotic. Dotfiles, packages, systemd services, and user permissions are disconnected. Change one thing, and the system gets "dirty"; undoing changes is nearly impossible.
+## 🆚 Monarch vs. The Ecosystem
 
-**Monarch ends this chaos.**
-
-It treats the system not as a monolithic entity, but as a collection of attachable and detachable **Rulesets**.
-
-- **Attach:** Apply the "Gaming Mode" ruleset. (Steam installs, drivers configure, kernel optimizes.)
-    
-- **Detach:** Done gaming? Remove the ruleset. Monarch deletes the packages, reverts the settings, and cleans up generated files, leaving the system **pristine**.
-    
-- **Defend (Self-Heal):** With the background Sentinel, if a file is manually corrupted, Monarch instantly repairs it.
-    
-
-## 🚀 Key Features
-
-### 1. Declarative & State-Aware
-
-Monarch doesn't run commands blindly. It first analyzes the system's `Current State`, compares it with your `Desired State`, and applies only the necessary `Diff`.
-
-### 2. The Lego Principle (Atomic Rulesets)
-
-An application is never just a "package". For Monarch, a _Ruleset_ is an atomic unit containing the package, configuration files, service definitions, and necessary user permissions.
-
-### 3. Agentless Architecture
-
-No need for Python, Ruby, or an installed agent on the target machine. Monarch is written in **Go** and runs as a single binary. It temporarily copies itself via SSH, executes the task, and vanishes without a trace.
-
-### 4. Sovereignty
-
-Manage your entire fleet—from your personal laptop to remote VPS servers—from a single control center.
-
-## 🆚 Why Monarch?
-
-Monarch combines the power of Ansible, the determinism of NixOS, and the state management of Terraform into a user-friendly package.
+Why build a new tool? Because existing solutions force you to choose between **flexibility** and **stability**.
 
 |   |   |   |   |   |
 |---|---|---|---|---|
-|**Feature**|**👑 Monarch**|**🐍 Ansible**|**❄️ NixOS**|**🐚 Shell Scripts**|
-|**Language / Speed**|**Go (Compiled, Blazing Fast)**|Python (Slow)|Nix (Complex)|Bash (Fast but unsafe)|
-|**Undo / Revert**|✅ **Native (Automatic)**|❌ None (Manual)|✅ (Rollback)|❌ None|
-|**State Tracking**|✅ **State.json + Checksum**|❌ Limited (Facts)|✅ (Store)|❌ None|
-|**Dependencies**|**None (Single Binary)**|Requires Python|Requires Specific OS|Dependency Hell|
-|**Learning Curve**|**Low (Lego Logic)**|Medium (YAML clutter)|Very High|Variable|
-|**Use Case**|Desktop & Server|Server Focused|Entire OS|Simple Tasks|
+|**Feature**|**👑 Monarch**|**❄️ NixOS**|**🐍 Ansible**|**📂 Chezmoi / Stow**|
+|**Primary Goal**|Modular Desktop Orchestration|Reproducible OS|Server Configuration|Dotfile Management|
+|**"Undo" Button**|✅ **Native** (Atomic Revert)|⚠️ Rollback (Whole OS)|❌ Manual Playbooks|❌ None|
+|**OS Requirement**|Any (Arch/Cachy, Fedora, etc.)|Must use NixOS|Any|Any|
+|**Scope**|Packages + Configs + Services|Everything|Everything|Config Files Only|
+|**Drift Detection**|✅ **Auto-Repair**|⚠️ Read-only Store|❌ Overwrite on run|❌ Overwrite on run|
+|**Learning Curve**|🟢 **Low** (Simple YAML)|🔴 Very High|🟡 Medium|🟢 Low|
 
-## 🏗️ Architecture: The Holy Trinity
+> **The Verdict:**
+> 
+> - **Use NixOS** if you are willing to replace your entire OS and learn a new language.
+>     
+> - **Use Ansible** if you are managing 1000 servers and don't care about "undoing" changes on a laptop.
+>     
+> - **Use Monarch** if you want the stability of NixOS on your favorite distro (like CachyOS) with the ease of use of a Lego set.
+>     
 
-The Monarch ecosystem is built on three main pillars:
+## 🚀 Key Features
 
-1. **Monarch Engine (CLI):** The brain. A Go-based core handling `resource`, `apply`, and `diff` logic.
-    
-2. **Monarch Hub (The Library):** GitHub-based global ruleset library. Pull "Hyprland Setup" or "DevOps Stack" rulesets created by others with a single command.
-    
-3. **Monarch Studio (GUI):** A modern desktop interface built with Wails to conquer terminal fear. Manage your system like a cockpit.
-    
+### 1. Profile-First Architecture
 
-## 🛠️ Tech Stack
-
-- **Core:** [Go (Golang)](https://go.dev/ "null") - High performance and concurrency.
-    
-- **Config:** YAML - Human-readable, simple structure.
-    
-- **State:** JSON - Portable and lightweight state tracking.
-    
-- **Security:** [Age (X25519)](https://github.com/FiloSottile/age "null") - Modern and secure secret management.
-    
-- **Transport:** SSH - Secure remote server management.
-    
-
-## ⚡ Quick Start (Alpha)
-
-Monarch is currently in active development. To try it out:
+Define your entire system personality in a single, human-readable YAML file. Switch between "Work Mode", "Gaming Mode", or "Minimal Mode" in seconds.
 
 ```
-# 1. Clone the repository
-git clone [https://github.com/melih-ucgun/monarch.git](https://github.com/melih-ucgun/monarch.git)
-cd monarch
-
-# 2. Build
-go build -o monarch main.go
-
-# 3. Apply an example configuration (Dry-Run)
-./monarch apply --config monarch.yaml --dry-run
+# ~/.config/monarch/profiles/workstation.yaml
+name: "Dev Workstation"
+description: "High performance setup for Go & Rust dev"
+rulesets:
+  - official:base-devel
+  - official:hyprland:latest
+  - community:vscode:insiders
+  - community:docker:rootless
+self_healing:
+  enabled: true
 ```
 
-### Example `monarch.yaml`
+### 2. Context-Aware Intelligence
+
+Monarch doesn't blindly run scripts. It analyzes the host first.
+
+> _Example:_ If you apply a gaming profile on a **Ryzen 7 7730u** laptop, Monarch intelligently selects `mesa` and `vulkan-radeon` instead of forcing NVIDIA drivers.
+
+### 3. True Undo Capability
+
+Most package managers remove the binary but leave the chaos. Monarch tracks every file created, every permission changed, and every service enabled.
 
 ```
-resources:
-  - type: package
-    id: neovim
-    name: neovim
-    state: present
-
-  - type: file
-    id: nvim-config
-    path: ~/.config/nvim/init.lua
-    content: |
-      print("Hello from Monarch Managed Config!")
-    owner: melih
-    mode: "0644"
-
-  - type: service
-    id: docker-service
-    name: docker
-    state: running
-    enabled: true
+monarch profile disable gaming
+# Result: System returns to the exact state before the profile was applied.
 ```
+
+## 📦 Installation & Quick Start
+
+Monarch is a single binary written in Go. No dependencies required.
+
+### 1. Install
+
+```
+curl -L [https://monarch.sh/install](https://monarch.sh/install) | sudo bash
+```
+
+### 2. Initialize (System Detection)
+
+This step scans your hardware (CPU, GPU) and OS (e.g., CachyOS, Arch, Fedora) to configure the local registry.
+
+```
+monarch init
+```
+
+### 3. Search & Apply
+
+Find what you need in the Hub and apply it.
+
+```
+# Find a window manager setup
+monarch hub search hyprland
+
+# Apply a pre-made profile (Dry run first!)
+monarch profile apply minimal-desktop --dry-run
+monarch profile apply minimal-desktop
+```
+
+## 🎮 Real-World Scenarios
+
+### Scenario A: The Modern Developer (Your Setup)
+
+Hardware: Lenovo IdeaPad (Ryzen 7, AMD Graphics)
+
+OS: CachyOS
+
+Goal: A clean, keyboard-driven development environment.
+
+```
+# 1. Create a fresh profile
+monarch profile create dev-laptop
+
+# 2. Add rulesets (Monarch auto-detects AMD GPU context)
+monarch profile add ruleset dev-laptop official:hyprland
+monarch profile add ruleset dev-laptop community:waybar-custom
+monarch profile add ruleset dev-laptop community:rofi-lbonn
+
+# 3. Apply
+monarch profile apply dev-laptop
+```
+
+_Result: A fully configured Hyprland environment with Waybar and Rofi, optimized for AMD integrated graphics._
+
+### Scenario B: The "Just for Tonight" Gamer
+
+**Goal:** Install heavy gaming tools, play for the weekend, and remove them completely for work on Monday.
+
+```
+# Friday Night:
+monarch profile apply hardcore-gaming
+
+# Monday Morning:
+monarch profile disable hardcore-gaming
+```
+
+_Result: Steam, Wine, Proton, and 20GB of dependencies are gone. No residual config files. No background services._
+
+## 🏗️ Architecture
+
+Monarch is built on the **Holy Trinity** of modern system orchestration:
+
+1. **The Engine (CLI):** * Written in **Go**.
+    
+    - Distro-agnostic core with adapters for `pacman`, `apt`, and `dnf`.
+        
+    - Manages state using local JSON tracking and checksums.
+        
+2. **The Hub:**
+    
+    - A decentralized registry of Rulesets (hosted on GitHub).
+        
+    - Includes compatibility scoring (e.g., "This ruleset is 100% compatible with Wayland").
+        
+3. **The Studio (Coming Soon):**
+    
+    - A Wails-based GUI to visually construct profiles.
+        
 
 ## 🗺️ Roadmap
 
-Monarch is constantly evolving. Here is our plan:
+|   |   |   |
+|---|---|---|
+|**Phase**|**Status**|**Focus Area**|
+|**1**|✅|**Core Engine:** Resource adapters, State management, Undo logic.|
+|**1.5**|🚧|**System Awareness:** Auto-detection of Hardware/OS, Profile Sync.|
+|**2**|⏳|**Hub Ecosystem:** Compatibility Scoring, Community Repository.|
+|**3**|🔮|**Monarch Studio:** GUI Dashboard & Visual Builder.|
 
-- [x] **Core (Ready):** Basic commands, file/package management, and state tracking.
-    
-- [ ] **Undo & Hub (Next):** `Undo` feature and GitHub integration.
-    
-- [ ] **Interface (GUI):** Modern desktop application and Hyprland integration.
-    
-- [ ] **Autonomous:** Self-healing system and fleet management.
-    
-## Licence
-This project is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+## 🤝 Contributing
 
-**Monarch** © 2025 Developed by Melih Uçgun
+Monarch is designed to be community-driven.
+
+- **Rule Creators:** Submit your custom Hyprland configs or Dev environments as Rulesets.
+    
+- **Go Developers:** Help us improve the resource adapters for non-Arch distros.
+    
+
+1. Fork the Project
+    
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+    
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+    
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+    
+5. Open a Pull Request
+    
+
+## 📜 License
+
+Distributed under the Apache 2.0 License. See `LICENSE` for more information.
+
+**Monarch** © 2025 Developed by **Melih Uçgun** _"We don't just configure systems—we build sovereign infrastructure."_
