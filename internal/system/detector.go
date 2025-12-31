@@ -20,7 +20,9 @@ func Detect(dryRun bool) *core.SystemContext {
 	ctx.OS = "linux"
 	ctx.Distro = info["ID"]
 	ctx.Version = info["VERSION_ID"]
+	ctx.Version = info["VERSION_ID"]
 	ctx.Hostname, _ = os.Hostname()
+	ctx.InitSystem = detectInitSystem()
 
 	if val, ok := info["ID_LIKE"]; ok {
 		if strings.Contains(val, "arch") {

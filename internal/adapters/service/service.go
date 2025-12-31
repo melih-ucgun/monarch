@@ -15,7 +15,7 @@ type ServiceAdapter struct {
 	ActionPerformed []string // To track actions for Revert (e.g., "started", "enabled")
 }
 
-func NewServiceAdapter(name string, params map[string]interface{}) *ServiceAdapter {
+func NewServiceAdapter(name string, params map[string]interface{}, ctx *core.SystemContext) *ServiceAdapter {
 	state, _ := params["state"].(string)
 	if state == "" {
 		state = "active"
@@ -26,9 +26,7 @@ func NewServiceAdapter(name string, params map[string]interface{}) *ServiceAdapt
 		enabled = e
 	}
 
-	// Future: Detect init system from context or params
-	// For now, default to systemd
-	mgr := NewSystemdManager()
+	mgr := GetServiceManager(ctx)
 
 	return &ServiceAdapter{
 		BaseResource: core.BaseResource{Name: name, Type: "service"},

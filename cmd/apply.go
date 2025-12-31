@@ -12,6 +12,7 @@ import (
 
 	"github.com/melih-ucgun/monarch/internal/config"
 	"github.com/melih-ucgun/monarch/internal/core"
+	"github.com/melih-ucgun/monarch/internal/hub"
 	"github.com/melih-ucgun/monarch/internal/resource"
 	"github.com/melih-ucgun/monarch/internal/state" // New import
 	"github.com/melih-ucgun/monarch/internal/system"
@@ -25,9 +26,26 @@ var applyCmd = &cobra.Command{
 	Long: `Reads the configuration file and ensures system state matches desired state.
 Updates .monarch/state.json with the results.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		configFile := "monarch.yaml"
+		var configFile string
 		if len(args) > 0 {
 			configFile = args[0]
+		} else {
+			// Check active profile
+			mgr := hub.NewProfileManager("")
+			profilePath, err := mgr.GetProfilePath("")
+			if err == nil && profilePath != "" {
+				// Verify file exists
+				if _, err := os.Stat(profilePath); err == nil {
+					configFile = profilePath
+					pterm.Info.Printf("Using active profile: %s\n", profilePath)
+				}
+			}
+
+			// Fallback
+			if configFile == "" {
+				configFile = "monarch.yaml"
+				pterm.Warning.Println("No active profile active. Defaulting to monarch.yaml")
+			}
 		}
 
 		if err := runApply(configFile, dryRun); err != nil {

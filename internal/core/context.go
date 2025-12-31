@@ -12,10 +12,11 @@ type SystemContext struct {
 	context.Context
 
 	// İşletim Sistemi Bilgileri
-	OS       string `yaml:"os"`       // runtime.GOOS (linux, darwin)
-	Distro   string `yaml:"distro"`   // ubuntu, arch, fedora
-	Version  string `yaml:"version"`  // 22.04, 38, rolling
-	Hostname string `yaml:"hostname"` // Makine adı
+	OS         string `yaml:"os"`          // runtime.GOOS (linux, darwin)
+	Distro     string `yaml:"distro"`      // ubuntu, arch, fedora
+	Version    string `yaml:"version"`     // 22.04, 38, rolling
+	InitSystem string `yaml:"init_system"` // systemd, openrc, sysvinit
+	Hostname   string `yaml:"hostname"`    // Makine adı
 
 	// Donanım Bilgileri
 	Hardware SystemHardware `yaml:"hardware"`
@@ -62,14 +63,15 @@ type SystemFS struct {
 // NewSystemContext, temel bir context oluşturur.
 func NewSystemContext(dryRun bool) *SystemContext {
 	return &SystemContext{
-		Context: context.Background(),
-		OS:      "unknown",
-		Distro:  "unknown",
-		User:    os.Getenv("USER"),
-		HomeDir: os.Getenv("HOME"),
-		DryRun:  dryRun,
-		Stdout:  os.Stdout,
-		Stderr:  os.Stderr,
+		Context:    context.Background(),
+		OS:         "unknown",
+		Distro:     "unknown",
+		InitSystem: "unknown",
+		User:       os.Getenv("USER"),
+		HomeDir:    os.Getenv("HOME"),
+		DryRun:     dryRun,
+		Stdout:     os.Stdout,
+		Stderr:     os.Stderr,
 		// Diğer alt structlar zero-value olarak başlar, detector tarafından doldurulur.
 	}
 }

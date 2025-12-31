@@ -1,0 +1,3 @@
+resources:
+  - type: exec
+    name: echo "Sub Config"

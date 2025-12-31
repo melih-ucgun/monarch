@@ -3,6 +3,7 @@ package resource
 import (
 	"fmt"
 
+	"github.com/melih-ucgun/monarch/internal/adapters/bundle"
 	"github.com/melih-ucgun/monarch/internal/adapters/file"
 	"github.com/melih-ucgun/monarch/internal/adapters/git"
 	"github.com/melih-ucgun/monarch/internal/adapters/identity"
@@ -83,9 +84,14 @@ func CreateResourceWithParams(resType string, name string, params map[string]int
 		return git.NewGitAdapter(name, params), nil
 	case "service", "systemd":
 		params["state"] = stateParam
-		return service.NewServiceAdapter(name, params), nil
+		return service.NewServiceAdapter(name, params, ctx), nil
 	case "exec", "shell", "cmd":
 		return shell.NewExecAdapter(name, params), nil
+
+	// Bundle
+	case "bundle":
+		// Recursively pass this factory function
+		return bundle.NewBundleAdapter(name, params, CreateResourceWithParams), nil
 
 	default:
 		return nil, fmt.Errorf("unknown resource type: %s", resType)

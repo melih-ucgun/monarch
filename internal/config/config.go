@@ -13,6 +13,7 @@ import (
 type Config struct {
 	Vars      map[string]string `yaml:"vars"`      // Global variables
 	Includes  []string          `yaml:"includes"`  // Other config files to include
+	Imports   []string          `yaml:"imports"`   // Alias for includes
 	Resources []ResourceConfig  `yaml:"resources"` // Resource list
 	Hosts     []Host            `yaml:"hosts"`     // Remote hosts (Optional)
 }
@@ -99,6 +100,9 @@ func loadConfigRecursive(path string, visited map[string]bool) (*Config, error) 
 
 	blockCfg := &cfg
 
+	// Merge Imports into Includes
+	blockCfg.Includes = append(blockCfg.Includes, blockCfg.Imports...)
+
 	// Variable Expansion for path resolution before recursing
 	// (If env var exists in includes field)
 	for i, inc := range blockCfg.Includes {
@@ -166,6 +170,11 @@ func expandConfig(cfg *Config) {
 
 func expandResource(res *ResourceConfig) {
 	res.Name = os.ExpandEnv(res.Name)
+
+	// Set default ID if empty
+	if res.ID == "" {
+		res.ID = fmt.Sprintf("%s:%s", res.Type, res.Name)
+	}
 	// ID does not change, references might break.
 	// Type and State can also be expanded
 	res.Type = os.ExpandEnv(res.Type)
