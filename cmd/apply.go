@@ -12,7 +12,7 @@ import (
 	"github.com/melih-ucgun/monarch/internal/config"
 	"github.com/melih-ucgun/monarch/internal/core"
 	"github.com/melih-ucgun/monarch/internal/resource"
-	"github.com/melih-ucgun/monarch/internal/state" // Yeni import
+	"github.com/melih-ucgun/monarch/internal/state" // New import
 	"github.com/melih-ucgun/monarch/internal/system"
 )
 
@@ -50,7 +50,7 @@ func runApply(configFile string, isDryRun bool) error {
 		pterm.ThemeDefault.SecondaryStyle.Println("Running in DRY-RUN mode")
 	}
 
-	// 1. Sistemi Tespit Et
+	// 1. Detect System
 	ctx := system.Detect(isDryRun)
 
 	// System Info Box
@@ -63,14 +63,14 @@ func runApply(configFile string, isDryRun bool) error {
 	pterm.DefaultTable.WithHasHeader(false).WithData(sysInfo).Render()
 	pterm.Println()
 
-	// 2. State Yöneticisini Başlat
+	// 2. Initialize State Manager
 	statePath := filepath.Join(".monarch", "state.json")
 	stateMgr, err := state.NewManager(statePath)
 	if err != nil {
 		pterm.Warning.Printf("Could not initialize state manager: %v\n", err)
 	}
 
-	// 3. Konfigürasyonu Yükle
+	// 3. Load Configuration
 	spinnerLoad, _ := pterm.DefaultSpinner.Start("Loading configuration...")
 	cfg, err := config.LoadConfig(configFile)
 	if err != nil {
@@ -79,7 +79,7 @@ func runApply(configFile string, isDryRun bool) error {
 	}
 	spinnerLoad.Success("Configuration loaded")
 
-	// 4. Kaynakları Sırala
+	// 4. Sort Resources
 	spinnerSort, _ := pterm.DefaultSpinner.Start("Resolving dependencies...")
 	sortedResources, err := config.SortResources(cfg.Resources)
 	if err != nil {
@@ -89,10 +89,10 @@ func runApply(configFile string, isDryRun bool) error {
 	spinnerSort.Success(fmt.Sprintf("Resolved %d layers", len(sortedResources)))
 	pterm.Println()
 
-	// 5. Motoru (Engine) Hazırla
+	// 5. Prepare Engine
 	eng := core.NewEngine(ctx, stateMgr)
 
-	// 6. Motoru Ateşle
+	// 6. Fire Engine
 	createFn := func(t, n string, p map[string]interface{}, c *core.SystemContext) (core.ApplyableResource, error) {
 		return resource.CreateResourceWithParams(t, n, p, c)
 	}

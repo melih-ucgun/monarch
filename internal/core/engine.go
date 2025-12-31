@@ -7,12 +7,12 @@ import (
 	"github.com/pterm/pterm"
 )
 
-// StateUpdater interface'i, Engine'in state paketine doğrudan bağımlı olmamasını sağlar.
+// StateUpdater interface allows Engine to be independent of the state package.
 type StateUpdater interface {
 	UpdateResource(resType, name, targetState, status string) error
 }
 
-// ConfigItem, motorun işleyeceği ham konfigürasyon parçasıdır.
+// ConfigItem is the raw configuration part that the engine will process.
 type ConfigItem struct {
 	Name   string
 	Type   string
@@ -20,17 +20,17 @@ type ConfigItem struct {
 	Params map[string]interface{}
 }
 
-// Engine, kaynakları yöneten ana yapıdır.
+// Engine is the main structure managing resources.
 type Engine struct {
 	Context        *SystemContext
-	StateUpdater   StateUpdater // Opsiyonel: State yöneticisi
+	StateUpdater   StateUpdater // Optional: State manager
 	AppliedHistory []ApplyableResource
 }
 
-// NewEngine yeni bir motor örneği oluşturur.
+// NewEngine creates a new engine instance.
 func NewEngine(ctx *SystemContext, updater StateUpdater) *Engine {
-	// Backup Yöneticisini başlat
-	_ = InitBackupManager() // Hata olursa şimdilik yoksay (veya logla)
+	// Initialize Backup Manager
+	_ = InitBackupManager() // Ignore error for now (or log)
 	return &Engine{
 		Context:      ctx,
 		StateUpdater: updater,
@@ -40,25 +40,25 @@ func NewEngine(ctx *SystemContext, updater StateUpdater) *Engine {
 // ResourceCreator fonksiyon tipi
 type ResourceCreator func(resType, name string, params map[string]interface{}, ctx *SystemContext) (ApplyableResource, error)
 
-// ApplyableResource arayüzü
+// ApplyableResource interface
 type ApplyableResource interface {
 	Apply(ctx *SystemContext) (Result, error)
 	GetName() string
 	GetType() string
 }
 
-// Run, verilen konfigürasyon listesini işler.
+// Run processes the given configuration list.
 func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 	errCount := 0
 
 	for _, item := range items {
-		// Params hazırlığı
+		// Params preparation
 		if item.Params == nil {
 			item.Params = make(map[string]interface{})
 		}
 		item.Params["state"] = item.State
 
-		// 1. Kaynağı oluştur
+		// 1. Create resource
 		res, err := createFn(item.Type, item.Name, item.Params, e.Context)
 		if err != nil {
 			Failure(err, "Skipping invalid resource definition: "+item.Name)
@@ -66,7 +66,7 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 			continue
 		}
 
-		// 2. Kaynağı uygula
+		// 2. Apply resource
 		result, err := res.Apply(e.Context)
 
 		status := "success"
@@ -80,9 +80,9 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 			fmt.Printf("ℹ️  [%s] OK\n", item.Name)
 		}
 
-		// 3. Durumu Kaydet (Eğer DryRun değilse)
+		// 3. Save State (If not DryRun)
 		if !e.Context.DryRun && e.StateUpdater != nil {
-			// Başarısız olsa bile son deneme durumunu "failed" olarak kaydediyoruz
+			// Save as "failed" even if it failed, to track the attempt
 			saveErr := e.StateUpdater.UpdateResource(item.Type, item.Name, item.State, status)
 			if saveErr != nil {
 				fmt.Printf("⚠️ Warning: Failed to save state for %s: %v\n", item.Name, saveErr)
@@ -96,25 +96,25 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 	return nil
 }
 
-// RunParallel, verilen layer'daki konfigürasyon parçalarını paralel işler.
+// RunParallel processes configuration items in the given layer in parallel.
 func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error {
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(layer))
-	var updatedResources []ApplyableResource // Başarılı olanları takip et (Rollback için)
-	var mu sync.Mutex                        // updatedResources için lock
+	var updatedResources []ApplyableResource // Track successful ones (For Rollback)
+	var mu sync.Mutex                        // lock for updatedResources
 
 	for _, item := range layer {
 		wg.Add(1)
 		go func(it ConfigItem) {
 			defer wg.Done()
 
-			// Params hazırlığı
+			// Params preparation
 			if it.Params == nil {
 				it.Params = make(map[string]interface{})
 			}
 			it.Params["state"] = it.State
 
-			// 1. Kaynağı oluştur
+			// 1. Create resource
 			res, err := createFn(it.Type, it.Name, it.Params, e.Context)
 			if err != nil {
 				Failure(err, "Skipping invalid resource definition: "+it.Name)
@@ -122,7 +122,7 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 				return
 			}
 
-			// 2. Kaynağı uygula
+			// 2. Apply resource
 			result, err := res.Apply(e.Context)
 
 			status := "success"
@@ -135,7 +135,7 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 				// Success
 				pterm.Success.Printf("[%s] %s: %s\n", it.Type, it.Name, result.Message)
 
-				// Başarılı değişiklikleri kaydet (Rollback için)
+				// Save successful changes (For Rollback)
 				if !e.Context.DryRun {
 					mu.Lock()
 					updatedResources = append(updatedResources, res)
@@ -143,12 +143,12 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 				}
 			} else {
 				// No Change (Info or Skipped)
-				// pterm.Info veya pterm.Debug (kullanıcı isterse)
-				// Şimdilik gri (Gray) veya Info.
+				// pterm.Info or pterm.Debug (if user wants)
+				// Currently Gray or Info.
 				pterm.Info.Printf("[%s] %s: OK\n", it.Type, it.Name)
 			}
 
-			// 3. Durumu Kaydet
+			// 3. Save State
 			if !e.Context.DryRun && e.StateUpdater != nil {
 				e.StateUpdater.UpdateResource(it.Type, it.Name, it.State, status)
 			}
@@ -158,42 +158,42 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 	wg.Wait()
 	close(errChan)
 
-	// Hata var mı kontrol et
+	// Check for errors
 	errCount := 0
 	for range errChan {
 		errCount++
 	}
 
 	if errCount > 0 {
-		// Rollback Tetikle
+		// Trigger Rollback
 		if !e.Context.DryRun {
 			pterm.Println()
 			pterm.Error.Println("Error occurred. Initiating Rollback...")
 
-			// 1. Önce şu anki katmanda başarılı olmuş (ancak diğerlerinin hatası yüzünden yarım kalmış) işlemleri geri al
+			// 1. First revert operations that succeeded in the current layer (but incomplete due to other errors)
 			pterm.Warning.Printf("Visualizing Rollback for current layer (%d resources)...\n", len(updatedResources))
 			e.rollback(updatedResources)
 
-			// 2. Önceki katmanlarda tamamlanmış işlemleri geri al
+			// 2. Revert operations completed in previous layers
 			pterm.Warning.Printf("Visualizing Rollback for previous layers (%d resources)...\n", len(e.AppliedHistory))
 			e.rollback(e.AppliedHistory)
 		}
 		return fmt.Errorf("encountered %d errors in parallel layer execution", errCount)
 	}
 
-	// Başarılı olanları global geçmişe ekle
-	// Not: Revert sırası için LIFO olması gerekir. rollback fonksiyonu listeyi tersten geziyor.
-	// AppliedHistory'ye eklerken FIFO ekliyoruz (append).
-	// Örnek: Layer0 (A, B) -> AppliedHistory=[A, B]
+	// Add successful ones to global history
+	// Note: Must be LIFO for Revert order. rollback function iterates specifically in reverse.
+	// We add FIFO to AppliedHistory (append).
+	// Example: Layer0 (A, B) -> AppliedHistory=[A, B]
 	// Layer1 (C, D) -> Fail. CurrentRevert(C). HistoryRevert(A, B) -> B revert, A revert. Correct.
 	e.AppliedHistory = append(e.AppliedHistory, updatedResources...)
 
 	return nil
 }
 
-// rollback, verilen kaynak listesini ters sırada geri alır.
+// rollback reverts the given list of resources in reverse order.
 func (e *Engine) rollback(resources []ApplyableResource) {
-	// Ters sırada git
+	// Go in reverse order
 	for i := len(resources) - 1; i >= 0; i-- {
 		res := resources[i]
 		if rev, ok := res.(Revertable); ok {
@@ -206,7 +206,7 @@ func (e *Engine) rollback(resources []ApplyableResource) {
 			} else {
 				pterm.Success.Printf("Reverted %s\n", res.GetName())
 				if !e.Context.DryRun && e.StateUpdater != nil {
-					// Başarılı revert, 'reverted' olarak işaretle
+					// Successful revert, mark as 'reverted'
 					_ = e.StateUpdater.UpdateResource(res.GetType(), res.GetName(), "any", "reverted")
 				}
 			}

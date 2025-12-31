@@ -9,15 +9,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config, monarch.yaml dosyasının kök yapısını temsil eder.
+// Config represents the root structure of monarch.yaml.
 type Config struct {
-	Vars      map[string]string `yaml:"vars"`      // Global değişkenler
-	Includes  []string          `yaml:"includes"`  // Dahil edilecek diğer config dosyaları
-	Resources []ResourceConfig  `yaml:"resources"` // Kaynak listesi
-	Hosts     []Host            `yaml:"hosts"`     // Uzak sunucular (Opsiyonel)
+	Vars      map[string]string `yaml:"vars"`      // Global variables
+	Includes  []string          `yaml:"includes"`  // Other config files to include
+	Resources []ResourceConfig  `yaml:"resources"` // Resource list
+	Hosts     []Host            `yaml:"hosts"`     // Remote hosts (Optional)
 }
 
-// ResourceConfig, her bir kaynağın (file, user, package vb.) konfigürasyonunu tutar.
+// ResourceConfig holds the configuration for each resource (file, user, package, etc.).
 type ResourceConfig struct {
 	ID        string                 `yaml:"id"`
 	Name      string                 `yaml:"name"`
@@ -27,7 +27,7 @@ type ResourceConfig struct {
 	Params    map[string]interface{} `yaml:"parameters"`
 }
 
-// Host, uzak sunucu bağlantı bilgilerini tutar.
+// Host holds connection information for a remote host.
 type Host struct {
 	Name           string `yaml:"name"`
 	Address        string `yaml:"address"`
@@ -35,32 +35,32 @@ type Host struct {
 	Port           int    `yaml:"port"`
 	SSHKeyPath     string `yaml:"ssh_key_path"`
 	BecomeMethod   string `yaml:"become_method"`   // sudo, su
-	BecomePassword string `yaml:"become_password"` // Opsiyonel (Vault'tan gelmesi önerilir)
+	BecomePassword string `yaml:"become_password"` // Optional (Recommended to come from Vault)
 }
 
-// LoadConfig, belirtilen yoldaki YAML dosyasını okur ve Config struct'ına çevirir.
+// LoadConfig reads the YAML file at the specified path and converts it into a Config struct.
 func LoadConfig(path string) (*Config, error) {
-	// Mutlak yol al
+	// Get absolute path
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, err
 	}
 
-	// 0. Proje kökünde veya config yanında .env varsa yükle
-	// Config dosyasının yanında ara
+	// 0. If .env exists in project root or next to config, load it
+	// Search next to config file
 	baseDir := filepath.Dir(absPath)
 	envPath := filepath.Join(baseDir, ".env")
 	if _, err := os.Stat(envPath); err == nil {
-		// .env bulundu, yükle. Hata varsa logla ama durma.
+		// .env found, load. Log if error but don't stop.
 		if loadErr := godotenv.Load(envPath); loadErr != nil && !os.IsNotExist(loadErr) {
-			// Sadece info geçebiliriz, henüz logger yok
+			// Just verify info, no logger yet
 			fmt.Printf("Warning: Failed to load .env file: %v\n", loadErr)
 		}
 	} else {
-		// Belki bir üst dizinde? (Proje root)
-		// Şimdilik sadece config yanında bakar.
-		// Alternatif: godotenv.Load() parametresiz çağrılırsa working dir'de arar.
-		// Bunu da deneyelim:
+		// Maybe in parent dir? (Project root)
+		// Currently only checks next to config.
+		// Alternative: godotenv.Load() without params searches in working dir.
+		// Let's try this too:
 		_ = godotenv.Load() // Ignore error (if no file found)
 	}
 
@@ -70,7 +70,7 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
-	// Recursive yükleme bitti, şimdi tüm string değerlerde variable expansion yap
+	// Recursive loading finished, now perform variable expansion on all string values
 	expandConfig(cfg)
 
 	return cfg, nil
@@ -84,7 +84,7 @@ func loadConfigRecursive(path string, visited map[string]bool) (*Config, error) 
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("dosya okuma hatası (%s): %w", path, err)
+		return nil, fmt.Errorf("file read error (%s): %w", path, err)
 	}
 
 	if len(data) == 0 {
@@ -93,18 +93,18 @@ func loadConfigRecursive(path string, visited map[string]bool) (*Config, error) 
 
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("yaml parse hatası (%s): %w", path, err)
+		return nil, fmt.Errorf("yaml parse error (%s): %w", path, err)
 	}
 
 	blockCfg := &cfg
 
 	// Variable Expansion for path resolution before recursing
-	// (Eğer includes alanında env var varsa)
+	// (If env var exists in includes field)
 	for i, inc := range blockCfg.Includes {
 		blockCfg.Includes[i] = os.ExpandEnv(inc)
 	}
 
-	// Include edilenleri işle
+	// Process included files
 	baseDir := filepath.Dir(path)
 	var allResources []ResourceConfig
 
@@ -139,13 +139,13 @@ func loadConfigRecursive(path string, visited map[string]bool) (*Config, error) 
 	return blockCfg, nil
 }
 
-// expandConfig tüm konfigürasyondaki string değerlerde Env Var substitution yapar.
+// expandConfig performs Env Var substitution on all string values in the configuration.
 func expandConfig(cfg *Config) {
 	// 1. Global Vars
 	for k, v := range cfg.Vars {
 		expanded := os.ExpandEnv(v)
 		cfg.Vars[k] = expanded
-		// Kaynaklar bu değişkenleri kullanabilsin diye environment'a ekle
+		// Add to environment so resources can use these variables
 		os.Setenv(k, expanded)
 	}
 
@@ -165,8 +165,8 @@ func expandConfig(cfg *Config) {
 
 func expandResource(res *ResourceConfig) {
 	res.Name = os.ExpandEnv(res.Name)
-	// ID değişmez, referanslar bozulabilir.
-	// Type ve State de expand edilebilir
+	// ID does not change, references might break.
+	// Type and State can also be expanded
 	res.Type = os.ExpandEnv(res.Type)
 	res.State = os.ExpandEnv(res.State)
 

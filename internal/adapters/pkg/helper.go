@@ -1,4 +1,4 @@
-package pkgmngs
+package pkg
 
 import (
 	"os/exec"

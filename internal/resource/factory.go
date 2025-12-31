@@ -3,14 +3,13 @@ package resource
 import (
 	"fmt"
 
+	"github.com/melih-ucgun/monarch/internal/adapters/file"
+	"github.com/melih-ucgun/monarch/internal/adapters/git"
+	"github.com/melih-ucgun/monarch/internal/adapters/identity"
+	"github.com/melih-ucgun/monarch/internal/adapters/pkg"
+	"github.com/melih-ucgun/monarch/internal/adapters/service"
+	"github.com/melih-ucgun/monarch/internal/adapters/shell"
 	"github.com/melih-ucgun/monarch/internal/core"
-
-	"github.com/melih-ucgun/monarch/internal/resource/adapters/files"
-	"github.com/melih-ucgun/monarch/internal/resource/adapters/identity"
-	"github.com/melih-ucgun/monarch/internal/resource/adapters/pkgmngs"
-	"github.com/melih-ucgun/monarch/internal/resource/adapters/scm"
-	"github.com/melih-ucgun/monarch/internal/resource/adapters/service"
-	"github.com/melih-ucgun/monarch/internal/resource/adapters/shell"
 )
 
 // Deprecated fonksiyon placeholder
@@ -29,46 +28,46 @@ func CreateResourceWithParams(resType string, name string, params map[string]int
 	switch resType {
 	// Package Managers
 	case "pacman":
-		return pkgmngs.NewPacmanAdapter(name, stateParam), nil
+		return pkg.NewPacmanAdapter(name, stateParam), nil
 	case "apt":
-		return pkgmngs.NewAptAdapter(name, stateParam), nil
+		return pkg.NewAptAdapter(name, stateParam), nil
 	case "dnf":
-		return pkgmngs.NewDnfAdapter(name, stateParam), nil
+		return pkg.NewDnfAdapter(name, stateParam), nil
 	case "brew":
-		return pkgmngs.NewBrewAdapter(name, stateParam), nil
+		return pkg.NewBrewAdapter(name, stateParam), nil
 	case "apk":
-		return pkgmngs.NewApkAdapter(name, stateParam), nil
+		return pkg.NewApkAdapter(name, stateParam), nil
 	case "flatpak":
-		return pkgmngs.NewFlatpakAdapter(name, stateParam), nil
+		return pkg.NewFlatpakAdapter(name, stateParam), nil
 	case "snap":
-		return pkgmngs.NewSnapAdapter(name, stateParam), nil
+		return pkg.NewSnapAdapter(name, stateParam), nil
 	case "zypper":
-		return pkgmngs.NewZypperAdapter(name, stateParam), nil
+		return pkg.NewZypperAdapter(name, stateParam), nil
 	case "yum":
-		return pkgmngs.NewYumAdapter(name, stateParam), nil
+		return pkg.NewYumAdapter(name, stateParam), nil
 	case "paru":
-		return pkgmngs.NewParuAdapter(name, stateParam), nil
+		return pkg.NewParuAdapter(name, stateParam), nil
 	case "yay":
-		return pkgmngs.NewYayAdapter(name, stateParam), nil
+		return pkg.NewYayAdapter(name, stateParam), nil
 	case "package", "pkg":
 		return detectPackageManager(name, stateParam, ctx)
 
 	// Filesystem
 	case "file":
 		params["state"] = stateParam
-		return files.NewFileAdapter(name, params), nil
+		return file.NewFileAdapter(name, params), nil
 	case "symlink":
 		params["state"] = stateParam
-		return files.NewSymlinkAdapter(name, params), nil
+		return file.NewSymlinkAdapter(name, params), nil
 	case "archive", "extract":
-		return files.NewArchiveAdapter(name, params), nil
+		return file.NewArchiveAdapter(name, params), nil
 	case "download":
-		return files.NewDownloadAdapter(name, params), nil
+		return file.NewDownloadAdapter(name, params), nil
 	case "template":
-		return files.NewTemplateAdapter(name, params), nil
+		return file.NewTemplateAdapter(name, params), nil
 	case "line_in_file", "lineinfile":
 		params["state"] = stateParam
-		return files.NewLineInFileAdapter(name, params), nil
+		return file.NewLineInFileAdapter(name, params), nil
 
 	// Identity
 	case "user":
@@ -81,7 +80,7 @@ func CreateResourceWithParams(resType string, name string, params map[string]int
 	// Others
 	case "git":
 		params["state"] = stateParam
-		return scm.NewGitAdapter(name, params), nil
+		return git.NewGitAdapter(name, params), nil
 	case "service", "systemd":
 		params["state"] = stateParam
 		return service.NewServiceAdapter(name, params), nil
@@ -96,17 +95,17 @@ func CreateResourceWithParams(resType string, name string, params map[string]int
 func detectPackageManager(name, state string, ctx *core.SystemContext) (core.Resource, error) {
 	switch ctx.Distro {
 	case "arch", "cachyos", "manjaro", "endeavouros":
-		return pkgmngs.NewPacmanAdapter(name, state), nil
+		return pkg.NewPacmanAdapter(name, state), nil
 	case "ubuntu", "debian", "pop", "mint", "kali":
-		return pkgmngs.NewAptAdapter(name, state), nil
+		return pkg.NewAptAdapter(name, state), nil
 	case "fedora", "rhel", "centos", "almalinux":
-		return pkgmngs.NewDnfAdapter(name, state), nil
+		return pkg.NewDnfAdapter(name, state), nil
 	case "alpine":
-		return pkgmngs.NewApkAdapter(name, state), nil
+		return pkg.NewApkAdapter(name, state), nil
 	case "opensuse", "sles":
-		return pkgmngs.NewZypperAdapter(name, state), nil
+		return pkg.NewZypperAdapter(name, state), nil
 	case "darwin":
-		return pkgmngs.NewBrewAdapter(name, state), nil
+		return pkg.NewBrewAdapter(name, state), nil
 	default:
 		return nil, fmt.Errorf("automatic package manager detection failed")
 	}

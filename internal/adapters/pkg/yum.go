@@ -1,4 +1,4 @@
-package pkgmngs
+package pkg
 
 import (
 	"fmt"
@@ -6,29 +6,29 @@ import (
 	"github.com/melih-ucgun/monarch/internal/core"
 )
 
-type DnfAdapter struct {
+type YumAdapter struct {
 	core.BaseResource
 	State string
 }
 
-func NewDnfAdapter(name string, state string) *DnfAdapter {
+func NewYumAdapter(name string, state string) *YumAdapter {
 	if state == "" {
 		state = "present"
 	}
-	return &DnfAdapter{
+	return &YumAdapter{
 		BaseResource: core.BaseResource{Name: name, Type: "package"},
 		State:        state,
 	}
 }
 
-func (r *DnfAdapter) Validate() error {
+func (r *YumAdapter) Validate() error {
 	if r.Name == "" {
-		return fmt.Errorf("package name is required for dnf")
+		return fmt.Errorf("package name is required for yum")
 	}
 	return nil
 }
 
-func (r *DnfAdapter) Check(ctx *core.SystemContext) (bool, error) {
+func (r *YumAdapter) Check(ctx *core.SystemContext) (bool, error) {
 	installed := isInstalled("rpm", "-q", r.Name)
 	if r.State == "absent" {
 		return installed, nil
@@ -36,14 +36,14 @@ func (r *DnfAdapter) Check(ctx *core.SystemContext) (bool, error) {
 	return !installed, nil
 }
 
-func (r *DnfAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
+func (r *YumAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 	needsAction, _ := r.Check(ctx)
 	if !needsAction {
 		return core.SuccessNoChange(fmt.Sprintf("Package %s already %s", r.Name, r.State)), nil
 	}
 
 	if ctx.DryRun {
-		return core.SuccessChange(fmt.Sprintf("[DryRun] dnf %s %s", r.State, r.Name)), nil
+		return core.SuccessChange(fmt.Sprintf("[DryRun] yum %s %s", r.State, r.Name)), nil
 	}
 
 	var args []string
@@ -53,10 +53,10 @@ func (r *DnfAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 		args = []string{"install", "-y", r.Name}
 	}
 
-	out, err := runCommand("dnf", args...)
+	out, err := runCommand("yum", args...)
 	if err != nil {
-		return core.Failure(err, "Dnf failed: "+out), err
+		return core.Failure(err, "Yum failed: "+out), err
 	}
 
-	return core.SuccessChange(fmt.Sprintf("Dnf processed %s", r.Name)), nil
+	return core.SuccessChange(fmt.Sprintf("Yum processed %s", r.Name)), nil
 }

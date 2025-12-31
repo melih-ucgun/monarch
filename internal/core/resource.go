@@ -1,7 +1,7 @@
 package core
 
-// Resource, sistemdeki yönetilebilir birimi temsil eden arayüz.
-// Artık Core paketinde olduğu için Import Cycle sorunu çözülüyor.
+// Resource is the interface representing a manageable unit in the system.
+// Solves Import Cycle issue by being in the Core package.
 type Resource interface {
 	Apply(ctx *SystemContext) (Result, error)
 	Check(ctx *SystemContext) (bool, error)
@@ -10,12 +10,12 @@ type Resource interface {
 	GetType() string
 }
 
-// Revertable, geri alınabilir kaynakların implemente etmesi gereken arayüz.
+// Revertable is the interface that revertible resources must implement.
 type Revertable interface {
 	Revert(ctx *SystemContext) error
 }
 
-// BaseResource, ortak alanları tutar.
+// BaseResource holds common fields.
 type BaseResource struct {
 	Name string `yaml:"name"`
 	Type string `yaml:"type"`
