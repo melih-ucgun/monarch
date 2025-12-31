@@ -59,9 +59,82 @@ else
 fi
 
 # ==========================================
-# Scenario 3: Rollback (Atomic Failure)
+# Scenario 3: Identity Management (Create User)
 # ==========================================
-echo -n "Test 3: Automatic Rollback... "
+echo -n "Test 3: Identity Management (Create User)... "
+
+# Ensure user doesn't exist
+userdel -r veto_test > /dev/null 2>&1 || true
+
+cat <<EOF > user.yaml
+resources:
+  - id: create-user
+    type: user
+    name: veto_test
+    params:
+      uid: "2000"
+      shell: /bin/sh
+      home: /home/veto_test
+    state: present
+EOF
+
+if veto apply user.yaml | grep -q "User created"; then
+    # Verify with system command
+    if id veto_test > /dev/null 2>&1; then
+        echo -e "${GREEN}PASS${NC}"
+    else
+        echo -e "${RED}FAIL (System verification failed)${NC}"
+        exit 1
+    fi
+else
+    echo -e "${RED}FAIL (Apply failed)${NC}"
+    exit 1
+fi
+
+# ==========================================
+# Scenario 4: User Rollback (Atomic Failure)
+# ==========================================
+echo -n "Test 4: User Rollback... "
+
+# Remove user again to have clean slate for rollback test
+userdel -r veto_test > /dev/null 2>&1 || true
+
+cat <<EOF > user_fail.yaml
+resources:
+  - id: create-user-rollback
+    type: user
+    name: veto_test
+    params:
+      uid: "2001"
+    state: present
+  - id: fail-step
+    type: pkg
+    name: missing-package-xyz
+    state: present
+EOF
+
+# Run Apply (Should fail)
+set +e
+veto apply user_fail.yaml > /dev/null 2>&1
+EXIT_CODE=$?
+set -e
+
+if [ $EXIT_CODE -eq 0 ]; then
+     echo -e "${RED}FAIL (Should have failed)${NC}"
+     exit 1
+fi
+
+if ! id veto_test > /dev/null 2>&1; then
+    echo -e "${GREEN}PASS (User reverted)${NC}"
+else
+    echo -e "${RED}FAIL (User still exists)${NC}"
+    exit 1
+fi
+
+# ==========================================
+# Scenario 5: Package Rollback (Atomic Failure)
+# ==========================================
+echo -n "Test 5: Package Rollback... "
 
 # Install 'vim' (valid) but fail on 'invalid-pkg'
 # We remove vim first
