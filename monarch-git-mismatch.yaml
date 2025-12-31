@@ -1,0 +1,8 @@
+resources:
+  - id: git-mismatch
+    type: git
+    parameters:
+      # We will point to a folder that has Hello-World (setup in script)
+      # But we claim it should be Monarch repo.
+      repo: https://github.com/melih-ucgun/monarch.git
+      dest: /tmp/monarch-git-verify/mismatch
