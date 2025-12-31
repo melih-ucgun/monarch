@@ -7,14 +7,25 @@ import (
 	"github.com/melih-ucgun/monarch/internal/core"
 )
 
+// DiscoverPackages scans for packages
+func DiscoverPackages(ctx *core.SystemContext) ([]string, error) {
+	return discoverPackages(ctx)
+}
+
+// DiscoverServices scans for services
+func DiscoverServices(initSystem string) ([]string, error) {
+	return discoverServices(initSystem)
+}
+
 // DiscoverSystem scans the system and returns a generated configuration.
+// Deprecated: logic moved to cmd/import.go for interactivity
 func DiscoverSystem(ctx *core.SystemContext) (*config.Config, error) {
 	cfg := &config.Config{
 		Resources: []config.ResourceConfig{},
 	}
 
 	// 1. Discover Packages
-	pkgs, err := discoverPackages(ctx)
+	pkgs, err := DiscoverPackages(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("package discovery failed: %w", err)
 	}
@@ -28,10 +39,8 @@ func DiscoverSystem(ctx *core.SystemContext) (*config.Config, error) {
 	}
 
 	// 2. Discover Services
-	services, err := discoverServices(ctx.InitSystem)
+	services, err := DiscoverServices(ctx.InitSystem)
 	if err != nil {
-		// Log error but continue? Or fail?
-		// Let's log and continue for partial result
 		fmt.Printf("Warning: Service discovery failed: %v\n", err)
 	}
 
@@ -45,8 +54,6 @@ func DiscoverSystem(ctx *core.SystemContext) (*config.Config, error) {
 			},
 		})
 	}
-
-	// Add comments/metadata if possible (YAML marshaler might not support comments easily)
 
 	return cfg, nil
 }
