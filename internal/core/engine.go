@@ -42,6 +42,7 @@ type ResourceCreator func(resType, name string, params map[string]interface{}, c
 type ApplyableResource interface {
 	Apply(ctx *SystemContext) (Result, error)
 	GetName() string
+	GetType() string
 }
 
 // Run, verilen konfigürasyon listesini işler.
@@ -191,8 +192,15 @@ func (e *Engine) rollback(resources []ApplyableResource) {
 			fmt.Printf("Visualizing Rollback for %s...\n", res.GetName())
 			if err := rev.Revert(e.Context); err != nil {
 				fmt.Printf("❌ Failed to revert %s: %v\n", res.GetName(), err)
+				if !e.Context.DryRun && e.StateUpdater != nil {
+					_ = e.StateUpdater.UpdateResource(res.GetType(), res.GetName(), "any", "revert_failed")
+				}
 			} else {
 				fmt.Printf("↺ Reverted %s\n", res.GetName())
+				if !e.Context.DryRun && e.StateUpdater != nil {
+					// Başarılı revert, 'reverted' olarak işaretle
+					_ = e.StateUpdater.UpdateResource(res.GetType(), res.GetName(), "any", "reverted")
+				}
 			}
 		}
 	}

@@ -7,6 +7,7 @@ type Resource interface {
 	Check(ctx *SystemContext) (bool, error)
 	Validate() error
 	GetName() string
+	GetType() string
 }
 
 // Revertable, geri alınabilir kaynakların implemente etmesi gereken arayüz.
@@ -22,4 +23,8 @@ type BaseResource struct {
 
 func (b *BaseResource) GetName() string {
 	return b.Name
+}
+
+func (b *BaseResource) GetType() string {
+	return b.Type
 }
