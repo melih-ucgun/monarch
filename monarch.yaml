@@ -1,0 +1,6 @@
+resources:
+  - id: test-file
+    type: file
+    params:
+      path: /tmp/monarch-test
+      content: "Hello Monarch"

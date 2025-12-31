@@ -155,7 +155,7 @@ Monarch is built on the **Holy Trinity** of modern system orchestration:
         
 3. **The Studio (Coming Soon):**
     
-    - A Wails-based GUI to visually construct profiles.
+    - A Wails-based GUI to visually construct profiles and rulesets.
         
 
 ## 🗺️ Roadmap

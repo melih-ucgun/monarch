@@ -55,10 +55,17 @@ func runApply(configFile string, isDryRun bool) error {
 
 	// System Info Box
 	sysInfo := [][]string{
-		{"OS", ctx.OS},
-		{"Distro", ctx.Distro},
-		{"User", ctx.User},
-		{"Time", time.Now().Format(time.RFC822)},
+		{"OS", fmt.Sprintf("%s (%s)", ctx.Distro, ctx.Version)},
+		{"Kernel", ctx.OS},
+		{"Host", ctx.Hostname},
+		{"User", fmt.Sprintf("%s (uid=%s)", ctx.User, ctx.UID)},
+		{"CPU", ctx.Hardware.CPUModel},
+		{"Cores", fmt.Sprintf("%d", ctx.Hardware.CPUCore)},
+		{"RAM", ctx.Hardware.RAMTotal},
+		{"GPU", fmt.Sprintf("%s %s", ctx.Hardware.GPUVendor, ctx.Hardware.GPUModel)},
+		{"Shell", ctx.Env.Shell},
+		{"FS", ctx.FS.RootFSType},
+		{"Time", time.Now().Format("15:04:05")},
 	}
 	pterm.DefaultTable.WithHasHeader(false).WithData(sysInfo).Render()
 	pterm.Println()
