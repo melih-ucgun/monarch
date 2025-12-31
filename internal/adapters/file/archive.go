@@ -35,7 +35,9 @@ func NewArchiveAdapter(name string, params map[string]interface{}) *ArchiveAdapt
 	mode := os.FileMode(0755)
 	if m, ok := params["mode"].(int); ok {
 		mode = os.FileMode(m)
-	}
+	} else if mDouble, ok := params["mode"].(float64); ok {
+		mode = os.FileMode(int(mDouble))
+	} // TODO: Handle string octal input
 
 	return &ArchiveAdapter{
 		BaseResource: core.BaseResource{Name: name, Type: "archive"},
@@ -119,8 +121,9 @@ func unzip(src, dest string) error {
 	for _, f := range r.File {
 		fpath := filepath.Join(dest, f.Name)
 
-		// Zip Slip zafiyetini önle
-		if !strings.HasPrefix(fpath, filepath.Clean(dest)+string(os.PathSeparator)) {
+		// Zip Slip zafiyetini önle - Daha güvenli Rel kontrolü
+		rel, err := filepath.Rel(dest, fpath)
+		if err != nil || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || rel == ".." {
 			return fmt.Errorf("illegal file path: %s", fpath)
 		}
 
@@ -145,10 +148,16 @@ func unzip(src, dest string) error {
 		}
 
 		_, err = io.Copy(outFile, rc)
-		outFile.Close()
+
+		// Ensure close errors are checked
+		closeErr := outFile.Close()
 		rc.Close()
+
 		if err != nil {
 			return err
+		}
+		if closeErr != nil {
+			return closeErr
 		}
 	}
 	return nil
@@ -180,8 +189,9 @@ func untar(src, dest string) error {
 
 		target := filepath.Join(dest, header.Name)
 
-		// Zip Slip önlemi
-		if !strings.HasPrefix(target, filepath.Clean(dest)+string(os.PathSeparator)) {
+		// Zip Slip zafiyetini önle - Daha güvenli Rel kontrolü
+		rel, err := filepath.Rel(dest, target)
+		if err != nil || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || rel == ".." {
 			return fmt.Errorf("illegal file path: %s", target)
 		}
 
@@ -190,19 +200,23 @@ func untar(src, dest string) error {
 			if err := os.MkdirAll(target, 0755); err != nil {
 				return err
 			}
-		case tar.TypeReg:
+		case tar.TypeReg, tar.TypeRegA:
 			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 				return err
 			}
-			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			f, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(header.Mode))
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(f, tr); err != nil {
-				f.Close()
+			_, err = io.Copy(f, tr)
+			closeErr := f.Close()
+
+			if err != nil {
 				return err
 			}
-			f.Close()
+			if closeErr != nil {
+				return closeErr
+			}
 		}
 	}
 	return nil
