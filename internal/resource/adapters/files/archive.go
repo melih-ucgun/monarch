@@ -11,11 +11,10 @@ import (
 	"strings"
 
 	"github.com/melih-ucgun/monarch/internal/core"
-	"github.com/melih-ucgun/monarch/internal/resource"
 )
 
 type ArchiveAdapter struct {
-	resource.BaseResource
+	core.BaseResource
 	Source string // Arşiv dosyasının yolu (örn: /tmp/app.zip)
 	Dest   string // Nereye açılacağı (örn: /opt/app)
 	Mode   os.FileMode
@@ -39,7 +38,7 @@ func NewArchiveAdapter(name string, params map[string]interface{}) *ArchiveAdapt
 	}
 
 	return &ArchiveAdapter{
-		BaseResource: resource.BaseResource{Name: name, Type: "archive"},
+		BaseResource: core.BaseResource{Name: name, Type: "archive"},
 		Source:       src,
 		Dest:         dest,
 		Mode:         mode,

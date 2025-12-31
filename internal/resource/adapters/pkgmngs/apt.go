@@ -1,14 +1,13 @@
-package pkg
+package pkgmngs
 
 import (
 	"fmt"
 
 	"github.com/melih-ucgun/monarch/internal/core"
-	"github.com/melih-ucgun/monarch/internal/resource"
 )
 
 type AptAdapter struct {
-	resource.BaseResource
+	core.BaseResource
 	State string
 }
 
@@ -17,7 +16,7 @@ func NewAptAdapter(name string, state string) *AptAdapter {
 		state = "present"
 	}
 	return &AptAdapter{
-		BaseResource: resource.BaseResource{Name: name, Type: "package"},
+		BaseResource: core.BaseResource{Name: name, Type: "package"},
 		State:        state,
 	}
 }

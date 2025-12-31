@@ -7,11 +7,10 @@ import (
 	"strings"
 
 	"github.com/melih-ucgun/monarch/internal/core"
-	"github.com/melih-ucgun/monarch/internal/resource"
 )
 
 type GroupAdapter struct {
-	resource.BaseResource
+	core.BaseResource
 	Gid    int
 	System bool
 	State  string
@@ -36,7 +35,7 @@ func NewGroupAdapter(name string, params map[string]interface{}) *GroupAdapter {
 	}
 
 	return &GroupAdapter{
-		BaseResource: resource.BaseResource{Name: name, Type: "group"},
+		BaseResource: core.BaseResource{Name: name, Type: "group"},
 		Gid:          gid,
 		System:       system,
 		State:        state,

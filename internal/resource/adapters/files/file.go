@@ -7,11 +7,10 @@ import (
 	"path/filepath"
 
 	"github.com/melih-ucgun/monarch/internal/core"
-	"github.com/melih-ucgun/monarch/internal/resource"
 )
 
 type FileAdapter struct {
-	resource.BaseResource
+	core.BaseResource
 	Path    string
 	Source  string // Kopyalanacak kaynak dosya (opsiyonel)
 	Content string // Yazılacak içerik (opsiyonel)
@@ -39,7 +38,7 @@ func NewFileAdapter(name string, params map[string]interface{}) *FileAdapter {
 	}
 
 	return &FileAdapter{
-		BaseResource: resource.BaseResource{Name: name, Type: "file"},
+		BaseResource: core.BaseResource{Name: name, Type: "file"},
 		Path:         path,
 		Source:       source,
 		Content:      content,

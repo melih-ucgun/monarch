@@ -4,11 +4,10 @@ import (
 	"fmt"
 
 	"github.com/melih-ucgun/monarch/internal/core"
-	"github.com/melih-ucgun/monarch/internal/resource"
 )
 
 type YumAdapter struct {
-	resource.BaseResource
+	core.BaseResource
 	State string
 }
 
@@ -17,7 +16,7 @@ func NewYumAdapter(name string, state string) *YumAdapter {
 		state = "present"
 	}
 	return &YumAdapter{
-		BaseResource: resource.BaseResource{Name: name, Type: "package"},
+		BaseResource: core.BaseResource{Name: name, Type: "package"},
 		State:        state,
 	}
 }

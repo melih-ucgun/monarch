@@ -73,13 +73,31 @@ func runApply(configFile string, isDryRun bool) error {
 	eng := core.NewEngine(ctx, stateMgr)
 
 	var items []core.ConfigItem
-	for _, res := range sortedResources {
-		items = append(items, core.ConfigItem{
-			Name:   res.Name,
-			Type:   res.Type,
-			State:  res.State,
-			Params: res.Params,
-		})
+	for _, layer := range sortedResources {
+		for _, res := range layer {
+			name := res.Name
+			if name == "" {
+				if n, ok := res.Params["name"].(string); ok {
+					name = n
+				}
+			}
+			if name == "" {
+				name = res.ID
+			}
+			state := res.State
+			if state == "" {
+				if s, ok := res.Params["state"].(string); ok {
+					state = s
+				}
+			}
+
+			items = append(items, core.ConfigItem{
+				Name:   name,
+				Type:   res.Type,
+				State:  state,
+				Params: res.Params,
+			})
+		}
 	}
 
 	fmt.Printf("📦 Processing %d resources...\n", len(items))

@@ -6,11 +6,10 @@ import (
 	"path/filepath"
 
 	"github.com/melih-ucgun/monarch/internal/core"
-	"github.com/melih-ucgun/monarch/internal/resource"
 )
 
 type SymlinkAdapter struct {
-	resource.BaseResource
+	core.BaseResource
 	Link   string // Linkin oluşacağı yer
 	Target string // Linkin hedefi
 	State  string
@@ -29,7 +28,7 @@ func NewSymlinkAdapter(name string, params map[string]interface{}) *SymlinkAdapt
 	}
 
 	return &SymlinkAdapter{
-		BaseResource: resource.BaseResource{Name: name, Type: "symlink"},
+		BaseResource: core.BaseResource{Name: name, Type: "symlink"},
 		Link:         link,
 		Target:       target,
 		State:        state,

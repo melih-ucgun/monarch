@@ -8,11 +8,10 @@ import (
 	"text/template"
 
 	"github.com/melih-ucgun/monarch/internal/core"
-	"github.com/melih-ucgun/monarch/internal/resource"
 )
 
 type TemplateAdapter struct {
-	resource.BaseResource
+	core.BaseResource
 	Src  string                 // Template dosyasının yolu
 	Dest string                 // Çıktı dosyasının yolu
 	Vars map[string]interface{} // Template içine gönderilecek değişkenler
@@ -37,7 +36,7 @@ func NewTemplateAdapter(name string, params map[string]interface{}) *TemplateAda
 	}
 
 	return &TemplateAdapter{
-		BaseResource: resource.BaseResource{Name: name, Type: "template"},
+		BaseResource: core.BaseResource{Name: name, Type: "template"},
 		Src:          src,
 		Dest:         dest,
 		Vars:         vars,

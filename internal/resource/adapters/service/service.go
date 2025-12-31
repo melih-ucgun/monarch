@@ -6,11 +6,10 @@ import (
 	"strings"
 
 	"github.com/melih-ucgun/monarch/internal/core"
-	"github.com/melih-ucgun/monarch/internal/resource"
 )
 
 type ServiceAdapter struct {
-	resource.BaseResource
+	core.BaseResource
 	State   string // active, stopped, restarted
 	Enabled bool   // true, false
 }
@@ -27,7 +26,7 @@ func NewServiceAdapter(name string, params map[string]interface{}) *ServiceAdapt
 	}
 
 	return &ServiceAdapter{
-		BaseResource: resource.BaseResource{Name: name, Type: "service"},
+		BaseResource: core.BaseResource{Name: name, Type: "service"},
 		State:        state,
 		Enabled:      enabled,
 	}

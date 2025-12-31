@@ -4,11 +4,10 @@ import (
 	"fmt"
 
 	"github.com/melih-ucgun/monarch/internal/core"
-	"github.com/melih-ucgun/monarch/internal/resource"
 )
 
 type ApkAdapter struct {
-	resource.BaseResource
+	core.BaseResource
 	State string
 }
 
@@ -17,7 +16,7 @@ func NewApkAdapter(name string, state string) *ApkAdapter {
 		state = "present"
 	}
 	return &ApkAdapter{
-		BaseResource: resource.BaseResource{Name: name, Type: "package"},
+		BaseResource: core.BaseResource{Name: name, Type: "package"},
 		State:        state,
 	}
 }

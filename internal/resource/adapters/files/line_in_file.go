@@ -7,11 +7,10 @@ import (
 	"strings"
 
 	"github.com/melih-ucgun/monarch/internal/core"
-	"github.com/melih-ucgun/monarch/internal/resource"
 )
 
 type LineInFileAdapter struct {
-	resource.BaseResource
+	core.BaseResource
 	Path   string
 	Line   string // Eklenecek/aranacak tam satır
 	Regexp string // Satırı bulmak için regex (opsiyonel)
@@ -33,7 +32,7 @@ func NewLineInFileAdapter(name string, params map[string]interface{}) *LineInFil
 	}
 
 	return &LineInFileAdapter{
-		BaseResource: resource.BaseResource{Name: name, Type: "line_in_file"},
+		BaseResource: core.BaseResource{Name: name, Type: "line_in_file"},
 		Path:         path,
 		Line:         line,
 		Regexp:       regex,

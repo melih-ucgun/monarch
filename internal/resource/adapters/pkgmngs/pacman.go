@@ -1,15 +1,14 @@
-package pkg
+package pkgmngs
 
 import (
 	"fmt"
 
 	"github.com/melih-ucgun/monarch/internal/core"
-	"github.com/melih-ucgun/monarch/internal/resource"
 )
 
 // PacmanAdapter, Arch Linux pacman paket yöneticisi için adaptör.
 type PacmanAdapter struct {
-	resource.BaseResource        // Ortak alanlar (Name, Type) buradan gelir
+	core.BaseResource        // Ortak alanlar (Name, Type) buradan gelir
 	State                 string // "present", "absent"
 }
 
@@ -19,7 +18,7 @@ func NewPacmanAdapter(name string, state string) *PacmanAdapter {
 		state = "present"
 	}
 	return &PacmanAdapter{
-		BaseResource: resource.BaseResource{Name: name, Type: "package"},
+		BaseResource: core.BaseResource{Name: name, Type: "package"},
 		State:        state,
 	}
 }

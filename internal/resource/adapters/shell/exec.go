@@ -5,11 +5,10 @@ import (
 	"os/exec"
 
 	"github.com/melih-ucgun/monarch/internal/core"
-	"github.com/melih-ucgun/monarch/internal/resource"
 )
 
 type ExecAdapter struct {
-	resource.BaseResource
+	core.BaseResource
 	Command string
 	Unless  string // Eğer bu komut başarılı olursa (exit 0), ana komutu çalıştırma
 	OnlyIf  string // Sadece bu komut başarılı olursa ana komutu çalıştır
@@ -25,7 +24,7 @@ func NewExecAdapter(name string, params map[string]interface{}) *ExecAdapter {
 	onlyif, _ := params["onlyif"].(string)
 
 	return &ExecAdapter{
-		BaseResource: resource.BaseResource{Name: name, Type: "exec"},
+		BaseResource: core.BaseResource{Name: name, Type: "exec"},
 		Command:      cmd,
 		Unless:       unless,
 		OnlyIf:       onlyif,

@@ -6,11 +6,10 @@ import (
 	"strings"
 
 	"github.com/melih-ucgun/monarch/internal/core"
-	"github.com/melih-ucgun/monarch/internal/resource"
 )
 
 type UserAdapter struct {
-	resource.BaseResource
+	core.BaseResource
 	Uid    string
 	Gid    string
 	Groups []string // Ek gruplar
@@ -49,7 +48,7 @@ func NewUserAdapter(name string, params map[string]interface{}) *UserAdapter {
 	}
 
 	return &UserAdapter{
-		BaseResource: resource.BaseResource{Name: name, Type: "user"},
+		BaseResource: core.BaseResource{Name: name, Type: "user"},
 		Uid:          uid,
 		Gid:          gid,
 		Groups:       groups,
