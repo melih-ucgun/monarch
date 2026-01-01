@@ -116,3 +116,25 @@ func splitLines(s string) []string {
 	}
 	return lines
 }
+
+// RemoveBatch removes multiple packages at once.
+func (r *PacmanAdapter) RemoveBatch(names []string, ctx *core.SystemContext) error {
+	if len(names) == 0 {
+		return nil
+	}
+
+	if ctx.DryRun {
+		fmt.Printf("[DryRun] Would remove packages: %s\n", strings.Join(names, ", "))
+		return nil
+	}
+
+	args := []string{"-Rns", "--noconfirm"}
+	args = append(args, names...)
+
+	output, err := runCommand("pacman", args...)
+	if err != nil {
+		return fmt.Errorf("failed to batch remove packages: %s: %w", output, err)
+	}
+
+	return nil
+}

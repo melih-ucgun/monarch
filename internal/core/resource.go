@@ -21,6 +21,12 @@ type Lister interface {
 	ListInstalled(ctx *SystemContext) ([]string, error)
 }
 
+// BatchRemover is the interface for resources that support removing multiple items at once.
+// Used in Prune operations for performance optimization.
+type BatchRemover interface {
+	RemoveBatch(names []string, ctx *SystemContext) error
+} // <--- Added
+
 // BaseResource holds common fields.
 type BaseResource struct {
 	Name string `yaml:"name"`

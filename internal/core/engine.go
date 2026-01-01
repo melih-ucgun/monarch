@@ -563,6 +563,18 @@ func (e *Engine) Prune(configItems []ConfigItem, createFn ResourceCreator) error
 	pterm.Info.Println("Starting cleanup...")
 
 	for _, task := range tasks {
+		// Check for BatchRemover support
+		if batchRemover, ok := task.Adapter.(BatchRemover); ok {
+			pterm.Info.Printf("Batch pruning %d %s resources...\n", len(task.Resources), task.Type)
+			if err := batchRemover.RemoveBatch(task.Resources, e.Context); err != nil {
+				pterm.Error.Printf("Batch removal failed: %v. Falling back to individual removal.\n", err)
+			} else {
+				pterm.Success.Printf("Batch pruning completed for %s\n", task.Type)
+				continue
+			}
+		}
+
+		// Individual Removal (Fallback or Default)
 		for _, name := range task.Resources {
 			pterm.Printf("Pruning [%s] %s... ", task.Type, name)
 
