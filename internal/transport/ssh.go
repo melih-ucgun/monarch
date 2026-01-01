@@ -10,12 +10,15 @@ import (
 
 	"github.com/melih-ucgun/veto/internal/config"
 	"github.com/melih-ucgun/veto/internal/core"
+	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
 
 type SSHTransport struct {
-	client *ssh.Client
-	config config.Host
+	client     *ssh.Client
+	sftpClient *sftp.Client
+	sftpFS     *SFTPFS
+	config     config.Host
 }
 
 func NewSSHTransport(ctx context.Context, host config.Host) (*SSHTransport, error) {
@@ -50,10 +53,24 @@ func NewSSHTransport(ctx context.Context, host config.Host) (*SSHTransport, erro
 		return nil, fmt.Errorf("ssh bağlantı hatası (%s): %w", host.Name, err)
 	}
 
-	return &SSHTransport{client: client, config: host}, nil
+	sftpClient, err := sftp.NewClient(client)
+	if err != nil {
+		client.Close()
+		return nil, fmt.Errorf("sftp başlatılamadı: %w", err)
+	}
+
+	return &SSHTransport{
+		client:     client,
+		sftpClient: sftpClient,
+		sftpFS:     NewSFTPFS(sftpClient),
+		config:     host,
+	}, nil
 }
 
 func (t *SSHTransport) Close() error {
+	if t.sftpClient != nil {
+		t.sftpClient.Close()
+	}
 	if t.client != nil {
 		return t.client.Close()
 	}
@@ -130,33 +147,38 @@ func (t *SSHTransport) CopyFile(ctx context.Context, localPath, remotePath strin
 		return err
 	}
 
-	session, err := t.client.NewSession()
+	remoteFile, err := t.sftpClient.Create(remotePath)
 	if err != nil {
 		return err
 	}
-	defer session.Close()
+	defer remoteFile.Close()
 
-	go func() {
-		w, _ := session.StdinPipe()
-		defer w.Close()
-		// SCP Protokolü başlığı
-		fmt.Fprintf(w, "C0%o %d %s\n", stat.Mode().Perm(), stat.Size(), remotePath)
-		io.Copy(w, localFile)
-		fmt.Fprint(w, "\x00")
-	}()
+	if _, err := io.Copy(remoteFile, localFile); err != nil {
+		return err
+	}
 
-	// scp -t (sink mode) ile karşı tarafta dosyayı karşıla
-	return session.Run(fmt.Sprintf("scp -t %s", remotePath))
+	return remoteFile.Chmod(stat.Mode().Perm())
 }
 
 func (t *SSHTransport) DownloadFile(ctx context.Context, remotePath, localPath string) error {
-	// İleride download özelliği (SFTP tabanlı) gerekirse burası doldurulabilir.
-	return fmt.Errorf("DownloadFile not implemented for SSHTransport (Phase 2)")
+	remoteFile, err := t.sftpClient.Open(remotePath)
+	if err != nil {
+		return err
+	}
+	defer remoteFile.Close()
+
+	localFile, err := os.Create(localPath)
+	if err != nil {
+		return err
+	}
+	defer localFile.Close()
+
+	_, err = io.Copy(localFile, remoteFile)
+	return err
 }
 
 func (t *SSHTransport) GetFileSystem() core.FileSystem {
-	// Bu aşamada henüz SFTPFS yok, nil dönebilir veya ileride dolacak.
-	return nil
+	return t.sftpFS
 }
 
 func (t *SSHTransport) GetOS(ctx context.Context) (string, error) {
