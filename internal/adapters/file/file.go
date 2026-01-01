@@ -69,9 +69,28 @@ func (r *FileAdapter) Validate() error {
 	if r.Path == "" {
 		return fmt.Errorf("file path is required")
 	}
-	if r.State == "present" && r.Source == "" && r.Content == "" {
-		return fmt.Errorf("either source or content must be provided for file resource")
+
+	if r.State != "present" && r.State != "absent" {
+		return fmt.Errorf("invalid state '%s', must be 'present' or 'absent'", r.State)
 	}
+
+	if r.State == "present" {
+		if r.Source == "" && r.Content == "" {
+			return fmt.Errorf("either 'source' or 'content' must be provided for file resource when state is 'present'")
+		}
+		if r.Source != "" && r.Content != "" {
+			return fmt.Errorf("cannot provide both 'source' and 'content' for file resource")
+		}
+		if r.Source != "" {
+			if _, err := os.Stat(r.Source); os.IsNotExist(err) {
+				return fmt.Errorf("source file '%s' does not exist", r.Source)
+			}
+		}
+		if r.Method != "copy" && r.Method != "symlink" {
+			return fmt.Errorf("invalid method '%s', must be 'copy' or 'symlink'", r.Method)
+		}
+	}
+
 	return nil
 }
 

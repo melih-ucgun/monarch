@@ -52,9 +52,18 @@ func NewTemplateAdapter(name string, params map[string]interface{}) core.Resourc
 }
 
 func (r *TemplateAdapter) Validate() error {
-	if r.Src == "" || r.Dest == "" {
-		return fmt.Errorf("template requires 'src' and 'dest'")
+	if r.Src == "" {
+		return fmt.Errorf("template source 'src' is required")
 	}
+	if r.Dest == "" {
+		return fmt.Errorf("template destination 'dest' is required")
+	}
+
+	// Template dosyasının varlığını kontrol et
+	if _, err := os.Stat(r.Src); os.IsNotExist(err) {
+		return fmt.Errorf("template source file '%s' does not exist", r.Src)
+	}
+
 	return nil
 }
 

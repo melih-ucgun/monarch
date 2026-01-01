@@ -71,6 +71,13 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 			continue
 		}
 
+		// 1.5 Validate resource configuration
+		if err := res.Validate(); err != nil {
+			pterm.Error.Printf("[%s] Validation Failed: %v\n", item.Name, err)
+			errCount++
+			continue
+		}
+
 		// 2. Apply resource
 		result, err := res.Apply(e.Context)
 
@@ -196,6 +203,13 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 			res, err := createFn(it.Type, it.Name, it.Params, e.Context)
 			if err != nil {
 				Failure(err, "Skipping invalid resource definition: "+it.Name)
+				errChan <- err
+				return
+			}
+
+			// 1.5 Validate resource configuration
+			if err := res.Validate(); err != nil {
+				pterm.Error.Printf("[%s] Validation Failed: %v\n", it.Name, err)
 				errChan <- err
 				return
 			}
@@ -357,6 +371,11 @@ func (e *Engine) Plan(items []ConfigItem, createFn ResourceCreator) (*PlanResult
 		resApp, err := createFn(item.Type, item.Name, item.Params, e.Context)
 		if err != nil {
 			return nil, fmt.Errorf("[%s] Creation Error: %w", item.Name, err)
+		}
+
+		// 1.5 Validate resource configuration
+		if err := resApp.Validate(); err != nil {
+			return nil, fmt.Errorf("[%s] Validation Error: %w", item.Name, err)
 		}
 
 		// 2. Check State

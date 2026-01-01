@@ -31,7 +31,10 @@ func NewDnfAdapter(name string, params map[string]interface{}) core.Resource {
 
 func (r *DnfAdapter) Validate() error {
 	if r.Name == "" {
-		return fmt.Errorf("package name is required for dnf")
+		return fmt.Errorf("package name is required")
+	}
+	if r.State != "present" && r.State != "absent" {
+		return fmt.Errorf("invalid state '%s', must be 'present' or 'absent'", r.State)
 	}
 	return nil
 }

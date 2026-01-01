@@ -34,7 +34,10 @@ func NewPacmanAdapter(name string, params map[string]interface{}) core.Resource 
 
 func (r *PacmanAdapter) Validate() error {
 	if r.Name == "" {
-		return fmt.Errorf("package name is required for pacman")
+		return fmt.Errorf("package name is required")
+	}
+	if r.State != "present" && r.State != "absent" {
+		return fmt.Errorf("invalid state '%s', must be 'present' or 'absent'", r.State)
 	}
 	return nil
 }

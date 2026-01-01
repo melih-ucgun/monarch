@@ -33,6 +33,9 @@ func (r *AptAdapter) Validate() error {
 	if r.Name == "" {
 		return fmt.Errorf("package name is required")
 	}
+	if r.State != "present" && r.State != "absent" {
+		return fmt.Errorf("invalid state '%s', must be 'present' or 'absent'", r.State)
+	}
 	return nil
 }
 
