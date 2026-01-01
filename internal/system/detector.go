@@ -2,10 +2,12 @@ package system
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"os/exec"
 	"os/user"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/melih-ucgun/veto/internal/core"
@@ -23,10 +25,22 @@ func Detect(dryRun bool) *core.SystemContext {
 	ctx.Version = info["VERSION_ID"]
 	ctx.Hostname, _ = os.Hostname()
 	ctx.InitSystem = detectInitSystem()
+	ctx.Kernel = detectKernel()
+
+	// Arch tabanlı veya versiyon bilgisi olmayan sistemler için Rolling Release kontrolü
+	if ctx.Version == "" {
+		rollingDistros := []string{"arch", "cachyos", "manjaro", "endeavouros"}
+		for _, d := range rollingDistros {
+			if strings.Contains(strings.ToLower(ctx.Distro), d) {
+				ctx.Version = "Rolling Release"
+				break
+			}
+		}
+	}
 
 	if val, ok := info["ID_LIKE"]; ok {
-		if strings.Contains(val, "arch") {
-			// Arch tabanlı sistemleri gerektiğinde işaretleyebiliriz
+		if strings.Contains(val, "arch") && ctx.Version == "" {
+			ctx.Version = "Rolling Release"
 		}
 	}
 
@@ -106,10 +120,13 @@ func detectHardware() core.SystemHardware {
 			if strings.HasPrefix(line, "MemTotal:") {
 				parts := strings.Fields(line)
 				if len(parts) >= 2 {
-					// KB cinsinden gelir, GB'a çevirelim (kabaca)
-					// parts[1] is e.g. "32655120"
-					// Basit tutmak için string olarak raw alıyorum, ileride parse edilebilir.
-					hw.RAMTotal = parts[1] + " " + parts[2]
+					// KB cinsinden gelir, GB'a çevirelim
+					if kb, err := strconv.Atoi(parts[1]); err == nil {
+						gb := float64(kb) / (1024 * 1024)
+						hw.RAMTotal = fmt.Sprintf("%.1f GB", gb)
+					} else {
+						hw.RAMTotal = parts[1] + " " + parts[2] // Fallback
+					}
 				}
 				break
 			}
@@ -208,4 +225,12 @@ func strLimit(s string, limit int) string {
 		return s[:limit] + "..."
 	}
 	return s
+}
+
+func detectKernel() string {
+	out, err := exec.Command("uname", "-r").Output()
+	if err != nil {
+		return "unknown"
+	}
+	return strings.TrimSpace(string(out))
 }

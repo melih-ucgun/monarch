@@ -13,6 +13,7 @@ type SystemContext struct {
 
 	// İşletim Sistemi Bilgileri
 	OS         string `yaml:"os"`          // runtime.GOOS (linux, darwin)
+	Kernel     string `yaml:"kernel"`      // 6.6.7-arch1-1
 	Distro     string `yaml:"distro"`      // ubuntu, arch, fedora
 	Version    string `yaml:"version"`     // 22.04, 38, rolling
 	InitSystem string `yaml:"init_system"` // systemd, openrc, sysvinit

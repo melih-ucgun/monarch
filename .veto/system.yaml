@@ -6,7 +6,7 @@ hostname: monarch
 hardware:
     cpu_model: AMD Ryzen 7 7730U with Radeon Graphics
     cpu_core: 16
-    ram_total: 14150256 kB
+    ram_total: 14150260 kB
     gpu_vendor: AMD
     gpu_model: Advanced Micro Devices, Inc. [AMD/ATI] B...
 env:

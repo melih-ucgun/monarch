@@ -75,13 +75,18 @@ func runInit() {
 
 func displaySystemInfo(ctx *core.SystemContext) {
 	data := [][]string{
-		{"OS", ctx.OS},
+		{"Kernel", ctx.Kernel},
 		{"Distro", ctx.Distro},
 		{"Version", ctx.Version},
+		{"Init System", ctx.InitSystem},
 		{"Hostname", ctx.Hostname},
 		{"User", ctx.User},
+		{"Home", ctx.HomeDir},
 		{"Shell", ctx.Env.Shell},
-		{"CPU", ctx.Hardware.CPUModel},
+		{"Language", ctx.Env.Lang},
+		{"Timezone", ctx.Env.Timezone},
+		{"CPU", fmt.Sprintf("%s (%d cores)", ctx.Hardware.CPUModel, ctx.Hardware.CPUCore)},
+		{"RAM", ctx.Hardware.RAMTotal},
 		{"GPU", ctx.Hardware.GPUVendor},
 		{"FS", ctx.FS.RootFSType},
 	}
@@ -95,6 +100,8 @@ func customizeProfile(ctx *core.SystemContext) {
 	ctx.Distro = ask("Distro", ctx.Distro)
 	ctx.Version = ask("Version", ctx.Version)
 	ctx.Env.Shell = ask("Shell", ctx.Env.Shell)
+	ctx.Env.Lang = ask("Language", ctx.Env.Lang)
+	ctx.Env.Timezone = ask("Timezone", ctx.Env.Timezone)
 	ctx.Hardware.GPUVendor = ask("GPU Vendor", ctx.Hardware.GPUVendor)
 
 	cursor.Hide()
