@@ -1,6 +1,0 @@
-imports:
-  - test-sub.yaml
-
-resources:
-  - type: exec
-    name: echo "Main Config"

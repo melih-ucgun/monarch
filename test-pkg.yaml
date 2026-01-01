@@ -1,6 +1,0 @@
-# test-nano.yaml
-resources:
-  - id: install-nano
-    type: pkg
-    name: nano
-    state: present

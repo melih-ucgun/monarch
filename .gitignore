@@ -1,3 +1,45 @@
-# .gitignore dosyasına ekle:
-internal/engine/embedded/monarch-*
+# Binaries
+/veto
+/bin/
+/dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+*.out
+
+# Logs
+*.log
+
+# Vendor
+/vendor/
+
+# Local State & Secrets
+.veto/
+.env
+*.key
+key.txt
+encrypted.txt
+
+# Generated Configs
+imported_*.yaml
+*_backup.yaml
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Embedded Workers (Cross-compiled)
+internal/engine/embedded/veto-linux-*
 !internal/engine/embedded/.keep
+
+# Temporary Test Files
+test-*.yaml
+history-test-file
