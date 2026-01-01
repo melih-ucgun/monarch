@@ -1,0 +1,15 @@
+resources:
+  - type: git
+    name: dotfiles-repo
+    params:
+      repo: "https://github.com/melih-ucgun/veto.git"
+      dest: "/tmp/dotfiles-test"
+      update: true
+
+  - type: symlink
+    name: link-readme
+    depends_on: ["git:dotfiles-repo"]
+    params:
+      path: "/tmp/my-readme"
+      target: "/tmp/dotfiles-test/README.md"
+      force: true
