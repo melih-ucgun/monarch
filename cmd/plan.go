@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"strings"
 
 	"github.com/melih-ucgun/veto/internal/config"
 	"github.com/melih-ucgun/veto/internal/core"
@@ -102,21 +103,46 @@ var planCmd = &cobra.Command{
 		for _, change := range planResult.Changes {
 			switch change.Action {
 			case "apply":
-				// Create/Modify - Green/Yellow would be nice if we knew distinct.
-				// Since we just know "Needs Action", lets use Yellow for Modify/Apply generic.
-				// Or Green + Symbol.
-				pterm.Printf("  %s %s %s \"%s\"\n",
+				pterm.Printf("  %s %s \"%s\" %s\n",
 					pterm.FgGreen.Sprint("+"),
 					pterm.Bold.Sprint(change.Type),
-					pterm.FgGreen.Sprint("will be applied"),
-					change.Name)
+					change.Name,
+					pterm.FgGreen.Sprint("will be applied"))
+
+				// Display Diff if available
+				if change.Diff != "" {
+					lines := strings.Split(change.Diff, "\n")
+					pterm.Println("    " + pterm.FgGray.Sprint("┌──────────────────────────────────────────┐"))
+					for _, line := range lines {
+						if line == "" {
+							continue
+						}
+
+						// Colorize based on first character
+						var out string
+						if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
+							out = pterm.FgGreen.Sprint(line)
+						} else if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") {
+							out = pterm.FgRed.Sprint(line)
+						} else if strings.HasPrefix(line, "@@") {
+							out = pterm.FgCyan.Sprint(line)
+						} else if strings.HasPrefix(line, "---") || strings.HasPrefix(line, "+++") {
+							out = pterm.Bold.Sprint(line)
+						} else {
+							out = line
+						}
+						pterm.Printf("    "+pterm.FgGray.Sprint("│ ")+"%s\n", out)
+					}
+					pterm.Println("    " + pterm.FgGray.Sprint("└──────────────────────────────────────────┘"))
+				}
 			case "noop":
-				// Usually hidden, but debug mode might show.
+				// Usually hidden
 			}
 		}
 
 		pterm.Println()
-		pterm.DefaultSection.Printf("Plan: %d to add/change.\n", len(planResult.Changes))
+		pterm.DefaultBasicText.WithStyle(pterm.NewStyle(pterm.FgCyan, pterm.Bold)).
+			Printf("Summary: %d resource(s) to be updated.\n", len(planResult.Changes))
 	},
 }
 

@@ -2,6 +2,15 @@ package resource
 
 import (
 	"github.com/melih-ucgun/veto/internal/core"
+
+	// Register all adapters
+	_ "github.com/melih-ucgun/veto/internal/adapters/bundle"
+	_ "github.com/melih-ucgun/veto/internal/adapters/file"
+	_ "github.com/melih-ucgun/veto/internal/adapters/git"
+	_ "github.com/melih-ucgun/veto/internal/adapters/identity"
+	_ "github.com/melih-ucgun/veto/internal/adapters/pkg"
+	_ "github.com/melih-ucgun/veto/internal/adapters/service"
+	_ "github.com/melih-ucgun/veto/internal/adapters/shell"
 )
 
 // CreateResourceWithParams uses the central registry to instantiate resources.
