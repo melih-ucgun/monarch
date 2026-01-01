@@ -178,15 +178,28 @@ var importCmd = &cobra.Command{
 			})
 		}
 
+		// Optimize package lookup
+		pkgMap := make(map[string]bool)
+		for _, p := range selectedPkgs {
+			pkgMap[p] = true
+		}
+
 		for _, s := range selectedServices {
-			cfg.Resources = append(cfg.Resources, config.ResourceConfig{
+			serviceRes := config.ResourceConfig{
 				Type:  "service",
 				Name:  s,
 				State: "running",
 				Params: map[string]interface{}{
 					"enabled": true,
 				},
-			})
+			}
+
+			// Auto-infer dependency: Service -> Package (if matched by name)
+			if pkgMap[s] {
+				serviceRes.DependsOn = []string{fmt.Sprintf("pkg:%s", s)}
+			}
+
+			cfg.Resources = append(cfg.Resources, serviceRes)
 		}
 
 		if len(cfg.Resources) == 0 {

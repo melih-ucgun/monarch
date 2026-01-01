@@ -4,7 +4,6 @@ go 1.25.5
 
 require (
 	atomicgo.dev/cursor v0.2.0
-	filippo.io/age v1.3.1
 	github.com/expr-lang/expr v1.17.7
 	github.com/joho/godotenv v1.5.1
 	github.com/pterm/pterm v0.12.82
@@ -16,7 +15,6 @@ require (
 require (
 	atomicgo.dev/keyboard v0.2.9 // indirect
 	atomicgo.dev/schedule v0.1.0 // indirect
-	filippo.io/hpke v0.4.0 // indirect
 	github.com/containerd/console v1.0.5 // indirect
 	github.com/gookit/color v1.5.4 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

@@ -7,6 +7,8 @@ import (
 
 	"github.com/joho/godotenv"
 	"gopkg.in/yaml.v3"
+
+	"github.com/melih-ucgun/veto/internal/crypto"
 )
 
 // Config represents the root structure of veto.yaml.
@@ -75,6 +77,7 @@ func LoadConfig(path string) (*Config, error) {
 
 	// Recursive loading finished, now perform variable expansion on all string values
 	expandConfig(cfg)
+	decryptConfig(cfg)
 
 	return cfg, nil
 }
@@ -240,4 +243,85 @@ func expandMap(m map[string]interface{}) {
 			}
 		}
 	}
+}
+
+// Security & Decryption
+
+func decryptConfig(cfg *Config) {
+	key := getMasterKey()
+	if key == "" {
+		// No key found. If there are encrypted values, they will remain as is (encrypted).
+		// This might cause errors later if the app expects plaintext, but safer than crashing.
+		// Alternatively, we could scan for IsEncrypted and warn.
+		return
+	}
+
+	// 1. Global Vars
+	for k, v := range cfg.Vars {
+		if decrypted, err := crypto.Decrypt(v, key); err == nil {
+			cfg.Vars[k] = decrypted
+			os.Setenv(k, decrypted)
+		}
+	}
+
+	// 2. Resources
+	for i := range cfg.Resources {
+		decryptResource(&cfg.Resources[i], key)
+	}
+
+	// 3. Hosts
+	for i := range cfg.Hosts {
+		if val, err := crypto.Decrypt(cfg.Hosts[i].BecomePassword, key); err == nil {
+			cfg.Hosts[i].BecomePassword = val
+		}
+	}
+}
+
+func decryptResource(res *ResourceConfig, key string) {
+	// Params (Recursive Map traversal)
+	decryptMap(res.Params, key)
+}
+
+func decryptMap(m map[string]interface{}, key string) {
+	for k, v := range m {
+		switch val := v.(type) {
+		case string:
+			if crypto.IsEncrypted(val) {
+				if decrypted, err := crypto.Decrypt(val, key); err == nil {
+					m[k] = decrypted
+				}
+			}
+		case map[string]interface{}:
+			decryptMap(val, key)
+		case []interface{}:
+			for i, item := range val {
+				if str, ok := item.(string); ok {
+					if crypto.IsEncrypted(str) {
+						if decrypted, err := crypto.Decrypt(str, key); err == nil {
+							val[i] = decrypted
+						}
+					}
+				} else if subMap, ok := item.(map[string]interface{}); ok {
+					decryptMap(subMap, key)
+				}
+			}
+		}
+	}
+}
+
+func getMasterKey() string {
+	// 1. Env Var
+	if key := os.Getenv("VETO_MASTER_KEY"); key != "" {
+		return key
+	}
+
+	// 2. File (~/.veto/master.key)
+	home, err := os.UserHomeDir()
+	if err == nil {
+		keyPath := filepath.Join(home, ".veto", "master.key")
+		if content, err := os.ReadFile(keyPath); err == nil {
+			return string(content)
+		}
+	}
+	return ""
 }

@@ -1,8 +1,10 @@
 package resource
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/melih-ucgun/veto/internal/adapters/service"
 	"github.com/melih-ucgun/veto/internal/core"
 )
 
@@ -17,8 +19,6 @@ func TestCreateResourceWithParams(t *testing.T) {
 		ctxOverride func(*core.SystemContext)
 		wantErr     bool
 	}{
-		// ... Mevcut testler ...
-
 		// YENİ: User & Group
 		{
 			name:    "Create User Resource",
@@ -64,7 +64,6 @@ func TestCreateResourceWithParams(t *testing.T) {
 		},
 	}
 
-	// Döngü mantığı aynı...
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			localCtx := *baseCtx
@@ -78,6 +77,89 @@ func TestCreateResourceWithParams(t *testing.T) {
 			}
 			if !tt.wantErr && res == nil {
 				t.Errorf("Returned nil resource")
+			}
+		})
+	}
+}
+
+func TestCreateResource_ContextAware(t *testing.T) {
+	tests := []struct {
+		distro   string
+		wantType string
+	}{
+		{"arch", "*pkg.PacmanAdapter"},
+		{"cachyos", "*pkg.PacmanAdapter"},
+		{"manjaro", "*pkg.PacmanAdapter"},
+		{"ubuntu", "*pkg.AptAdapter"},
+		{"debian", "*pkg.AptAdapter"},
+		{"fedora", "*pkg.DnfAdapter"},
+		{"alpine", "*pkg.ApkAdapter"},
+		{"opensuse", "*pkg.ZypperAdapter"},
+		// Unknown falls back to error
+		{"unknown-os", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run("Distro="+tt.distro, func(t *testing.T) {
+			ctx := core.NewSystemContext(false)
+			ctx.Distro = tt.distro
+
+			// Request generic "pkg" resource
+			res, err := CreateResourceWithParams("pkg", "vim", nil, ctx)
+
+			if tt.wantType == "" {
+				if err == nil {
+					t.Errorf("Expected error for distro %s, got none", tt.distro)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("Unexpected error: %v", err)
+				}
+				gotType := fmt.Sprintf("%T", res)
+				if gotType != tt.wantType {
+					t.Errorf("For distro %s, want type %s, got %s", tt.distro, tt.wantType, gotType)
+				}
+			}
+		})
+	}
+}
+
+func TestCreateResource_InitSystemAware(t *testing.T) {
+	tests := []struct {
+		initSystem  string
+		wantManager string // Type name of the inner manager
+	}{
+		{"systemd", "*service.SystemdManager"},
+		{"openrc", "*service.OpenRCManager"},
+		{"sysvinit", "*service.SysVinitManager"},
+		// Default fallback
+		{"unknown", "*service.SystemdManager"},
+	}
+
+	for _, tt := range tests {
+		t.Run("Init="+tt.initSystem, func(t *testing.T) {
+			ctx := core.NewSystemContext(false)
+			ctx.InitSystem = tt.initSystem
+
+			// Request "service" resource
+			res, err := CreateResourceWithParams("service", "nginx", nil, ctx)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			// ServiceAdapter struct'ı içindeki Manager alanını kontrol etmeliyiz.
+			// ServiceAdapter public olmadığı için cast edemeyebiliriz ama tipini kontrol edebiliriz.
+			// Ancak burada 'factory' paketi 'service' paketini import ediyor.
+			// ServiceAdapter export edilmiş durumda.
+
+			svcAdapter, ok := res.(*service.ServiceAdapter)
+			if !ok {
+				t.Fatalf("Expected *service.ServiceAdapter, got %T", res)
+			}
+
+			gotManager := fmt.Sprintf("%T", svcAdapter.Manager)
+			if gotManager != tt.wantManager {
+				t.Errorf("For init %s, want manager %s, got %s", tt.initSystem, tt.wantManager, gotManager)
 			}
 		})
 	}

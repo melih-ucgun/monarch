@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
 
@@ -19,10 +20,18 @@ func Execute() error {
 
 func init() {
 	// Varsayılan JSON loglayıcı ayarla (veya isteğe bağlı TextHandler)
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	})
 	slog.SetDefault(slog.New(handler))
+
+	// PTerm output to Stderr (to keep Stdout clean for piping)
+	pterm.SetDefaultOutput(os.Stderr)
+	pterm.Success.Writer = os.Stderr
+	pterm.Info.Writer = os.Stderr
+	pterm.Error.Writer = os.Stderr
+	pterm.Warning.Writer = os.Stderr
+	pterm.DefaultHeader.Writer = os.Stderr
 
 	rootCmd.PersistentFlags().StringP("config", "c", "veto.yaml", "config file path")
 }

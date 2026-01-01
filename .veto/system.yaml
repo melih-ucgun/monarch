@@ -1,12 +1,13 @@
 os: linux
+kernel: 6.18.2-2-cachyos
 distro: cachyos
-version: ""
+version: Rolling Release
 init_system: systemd
 hostname: monarch
 hardware:
     cpu_model: AMD Ryzen 7 7730U with Radeon Graphics
     cpu_core: 16
-    ram_total: 14150260 kB
+    ram_total: 13.5 GB
     gpu_vendor: AMD
     gpu_model: Advanced Micro Devices, Inc. [AMD/ATI] B...
 env:

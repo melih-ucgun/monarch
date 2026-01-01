@@ -20,6 +20,9 @@ func CreateResource(resType string, name string, state string, ctx *core.SystemC
 
 // CreateResourceWithParams artık core.Resource döndürüyor
 func CreateResourceWithParams(resType string, name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+	if params == nil {
+		params = make(map[string]interface{})
+	}
 
 	stateParam, _ := params["state"].(string)
 	if stateParam == "" {
