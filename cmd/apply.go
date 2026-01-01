@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
+	"github.com/melih-ucgun/veto/internal/adapters/snapshot"
 	"github.com/melih-ucgun/veto/internal/config"
 	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/hub"
@@ -19,6 +20,7 @@ import (
 )
 
 var dryRun bool
+var noSnapshot bool
 
 var applyCmd = &cobra.Command{
 	Use:   "apply [config_file]",
@@ -48,7 +50,7 @@ Updates .veto/state.json with the results.`,
 			}
 		}
 
-		if err := runApply(configFile, dryRun); err != nil {
+		if err := runApply(configFile, dryRun, noSnapshot); err != nil {
 			os.Exit(1)
 		}
 	},
@@ -57,9 +59,10 @@ Updates .veto/state.json with the results.`,
 func init() {
 	rootCmd.AddCommand(applyCmd)
 	applyCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Simulate changes without applying them")
+	applyCmd.Flags().BoolVar(&noSnapshot, "no-snapshot", false, "Disable automatic BTRFS snapshots")
 }
 
-func runApply(configFile string, isDryRun bool) error {
+func runApply(configFile string, isDryRun bool, skipSnapshot bool) error {
 	// Header
 	pterm.DefaultHeader.WithFullWidth().WithBackgroundStyle(pterm.NewStyle(pterm.BgLightBlue)).
 		WithTextStyle(pterm.NewStyle(pterm.FgBlack, pterm.Bold)).
@@ -78,6 +81,31 @@ func runApply(configFile string, isDryRun bool) error {
 		// Override detected context with saved profile
 		if err := yaml.Unmarshal(data, ctx); err != nil {
 			pterm.Warning.Printf("Failed to parse system profile: %v\n", err)
+		}
+	}
+
+	// Snapshot Manager Setup
+	var snapMgr *snapshot.Manager
+	var preSnapID string
+
+	// Check if we should attempt a snapshot
+	if !isDryRun && !skipSnapshot {
+		// NewManager akıllıca seçim yapar (Snapper > Timeshift)
+		snapMgr = snapshot.NewManager(ctx.FS.RootFSType)
+
+		if snapMgr != nil && snapMgr.IsAvailable() {
+			pterm.Info.Printf("Snapshot System: %s detected\n", snapMgr.ProviderName())
+
+			id, err := snapMgr.CreatePreSnapshot(fmt.Sprintf("Pre-Veto Apply: %s", configFile))
+			if err != nil {
+				pterm.Warning.Printf("Snapshot failed: %v (continuing anyway)\n", err)
+			} else {
+				preSnapID = id
+				// Timeshift 'done' döndürür, Snapper ID döndürür.
+				if id != "done" {
+					pterm.Success.Printf("Pre-snapshot created: #%s\n", id)
+				}
+			}
 		}
 	}
 
@@ -132,6 +160,8 @@ func runApply(configFile string, isDryRun bool) error {
 		return resource.CreateResourceWithParams(t, n, p, c)
 	}
 
+	finalError := error(nil)
+
 	for i, layer := range sortedResources {
 		// Layer Header
 		pterm.DefaultSection.Printf("Phase %d: Processing %d resources", i+1, len(layer))
@@ -169,9 +199,27 @@ func runApply(configFile string, isDryRun bool) error {
 		if err := eng.RunParallel(layerItems, createFn); err != nil {
 			spinnerExec.Fail(fmt.Sprintf("Layer %d failed", i+1))
 			pterm.Error.Printf("Layer %d completed with errors: %v\n", i+1, err)
-			return err
+			finalError = err // Keep track of error
+			break            // Stop processing layers on failure
 		}
 		spinnerExec.Success(fmt.Sprintf("Layer %d complete", i+1))
+	}
+
+	// Post Snapshot Logic
+	if preSnapID != "" && snapMgr != nil {
+		desc := fmt.Sprintf("Post-Veto Apply: %s", configFile)
+		if finalError != nil {
+			desc += " (Failed)"
+		}
+
+		// Manager arka tarafta Timeshift ise post-snapshot'ı atlayabilir
+		if err := snapMgr.CreatePostSnapshot(preSnapID, desc); err != nil {
+			pterm.Warning.Printf("Post-snapshot failed: %v\n", err)
+		}
+	}
+
+	if finalError != nil {
+		return finalError
 	}
 
 	pterm.Println()

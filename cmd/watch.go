@@ -9,6 +9,7 @@ import (
 )
 
 var interval int
+var withSnapshot bool
 
 var watchCmd = &cobra.Command{
 	Use:   "watch [config_file]",
@@ -26,7 +27,7 @@ Polls the file system every few seconds (configurable).`,
 		fmt.Println("Press Ctrl+C to stop.")
 
 		// İlk başlangıçta bir kez çalıştır
-		if err := runApply(configFile, dryRun); err != nil {
+		if err := runApply(configFile, dryRun, !withSnapshot); err != nil {
 			fmt.Printf("⚠️ Initial apply failed, but keeping watch...\n")
 		}
 
@@ -38,6 +39,7 @@ func init() {
 	rootCmd.AddCommand(watchCmd)
 	watchCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Simulate changes without applying them")
 	watchCmd.Flags().IntVarP(&interval, "interval", "i", 2, "Polling interval in seconds")
+	watchCmd.Flags().BoolVar(&withSnapshot, "with-snapshot", false, "Enable automatic snapshots during watch")
 }
 
 func watchLoop(filename string, intervalSec int) {
@@ -70,7 +72,7 @@ func watchLoop(filename string, intervalSec int) {
 
 			// Apply işlemini çağır (cmd/apply.go içindeki fonksiyonu kullanıyoruz)
 			// Not: runApply fonksiyonu aynı pakette (cmd) olduğu için erişilebilir.
-			if err := runApply(filename, dryRun); err != nil {
+			if err := runApply(filename, dryRun, !withSnapshot); err != nil {
 				fmt.Printf("❌ Apply failed: %v\n", err)
 			} else {
 				fmt.Printf("✅ Update successful. Watching for new changes...\n")
