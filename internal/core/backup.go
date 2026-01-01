@@ -13,29 +13,33 @@ import (
 // BackupManager, dosya yedekleme işlemlerini yönetir.
 type BackupManager struct {
 	BackupDir string
+	FS        FileSystem
 }
 
 // Global backup instance (basitlik için)
 var GlobalBackup *BackupManager
 
 // InitBackupManager, yedekleme dizinini hazırlar.
-func InitBackupManager() error {
+func InitBackupManager(fs FileSystem) error {
 	// .veto/backups/YYYYMMDD-HHMMSS formatında klasör oluştur
 	timestamp := time.Now().Format("20060102-150405")
 	backupDir := filepath.Join(".veto", "backups", timestamp)
 
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := fs.MkdirAll(backupDir, 0755); err != nil {
 		return fmt.Errorf("failed to create backup dir: %w", err)
 	}
 
-	GlobalBackup = &BackupManager{BackupDir: backupDir}
+	GlobalBackup = &BackupManager{
+		BackupDir: backupDir,
+		FS:        fs,
+	}
 	return nil
 }
 
 // BackupFile, verilen dosyayı yedekler ve yedek yolunu döner.
 // Eğer dosya yoksa (yeni oluşturulacaksa), boş string döner (hata değil).
 func (bm *BackupManager) BackupFile(path string) (string, error) {
-	info, err := os.Stat(path)
+	info, err := bm.FS.Stat(path)
 	if os.IsNotExist(err) {
 		return "", nil // Dosya yok, yedeklemeye gerek yok
 	}
@@ -57,13 +61,13 @@ func (bm *BackupManager) BackupFile(path string) (string, error) {
 	backupPath := filepath.Join(bm.BackupDir, flatFilename)
 
 	// Dosyayı kopyala
-	srcFile, err := os.Open(path)
+	srcFile, err := bm.FS.Open(path)
 	if err != nil {
 		return "", err
 	}
 	defer srcFile.Close()
 
-	destFile, err := os.Create(backupPath)
+	destFile, err := bm.FS.Create(backupPath)
 	if err != nil {
 		return "", err
 	}

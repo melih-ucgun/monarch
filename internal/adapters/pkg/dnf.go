@@ -29,7 +29,7 @@ func NewDnfAdapter(name string, params map[string]interface{}) core.Resource {
 	}
 }
 
-func (r *DnfAdapter) Validate() error {
+func (r *DnfAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Name == "" {
 		return fmt.Errorf("package name is required")
 	}

@@ -109,7 +109,7 @@ func displaySystemInfo(ctx *core.SystemContext) {
 		{"CPU", fmt.Sprintf("%s (%d cores)", ctx.Hardware.CPUModel, ctx.Hardware.CPUCore)},
 		{"RAM", ctx.Hardware.RAMTotal},
 		{"GPU", ctx.Hardware.GPUVendor},
-		{"FS", ctx.FS.RootFSType},
+		{"FS", ctx.FSInfo.RootFSType},
 	}
 	pterm.DefaultTable.WithHasHeader(false).WithData(data).Render()
 }

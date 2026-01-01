@@ -28,7 +28,7 @@ func NewYumAdapter(name string, params map[string]interface{}) core.Resource {
 	}
 }
 
-func (r *YumAdapter) Validate() error {
+func (r *YumAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Name == "" {
 		return fmt.Errorf("package name is required for yum")
 	}

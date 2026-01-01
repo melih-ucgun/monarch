@@ -44,7 +44,7 @@ func NewServiceAdapter(name string, params map[string]interface{}, ctx *core.Sys
 	}
 }
 
-func (r *ServiceAdapter) Validate() error {
+func (r *ServiceAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Name == "" {
 		return fmt.Errorf("service name is required")
 	}

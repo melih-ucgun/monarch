@@ -29,7 +29,7 @@ func NewParuAdapter(name string, params map[string]interface{}) core.Resource {
 	}
 }
 
-func (r *ParuAdapter) Validate() error {
+func (r *ParuAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Name == "" {
 		return fmt.Errorf("package name is required for paru")
 	}

@@ -49,7 +49,7 @@ func NewLineInFileAdapter(name string, params map[string]interface{}) core.Resou
 	}
 }
 
-func (r *LineInFileAdapter) Validate() error {
+func (r *LineInFileAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Path == "" {
 		return fmt.Errorf("path is required")
 	}
@@ -60,7 +60,7 @@ func (r *LineInFileAdapter) Validate() error {
 }
 
 func (r *LineInFileAdapter) Check(ctx *core.SystemContext) (bool, error) {
-	content, err := os.ReadFile(r.Path)
+	content, err := ctx.FS.ReadFile(r.Path)
 	if os.IsNotExist(err) {
 		if r.State == "absent" {
 			return false, nil
@@ -122,7 +122,7 @@ func (r *LineInFileAdapter) Apply(ctx *core.SystemContext) (core.Result, error) 
 
 	// Dosyayı oku (veya oluştur)
 	var lines []string
-	if content, err := os.ReadFile(r.Path); err == nil {
+	if content, err := ctx.FS.ReadFile(r.Path); err == nil {
 		lines = strings.Split(string(content), "\n")
 		// Son satır boşsa temizle (genellikle split boş string üretir)
 		if len(lines) > 0 && lines[len(lines)-1] == "" {
@@ -154,7 +154,10 @@ func (r *LineInFileAdapter) Apply(ctx *core.SystemContext) (core.Result, error) 
 	} else {
 		// Ekleme/Güncelleme Modu
 		replaced := false
-		re, _ := regexp.Compile(r.Regexp)
+		var re *regexp.Regexp
+		if r.Regexp != "" {
+			re, _ = regexp.Compile(r.Regexp)
+		}
 
 		for _, l := range lines {
 			if r.Regexp != "" && re.MatchString(l) {
@@ -190,7 +193,7 @@ func (r *LineInFileAdapter) Apply(ctx *core.SystemContext) (core.Result, error) 
 		output += "\n"
 	}
 
-	if err := os.WriteFile(r.Path, []byte(output), 0644); err != nil {
+	if err := ctx.FS.WriteFile(r.Path, []byte(output), 0644); err != nil {
 		return core.Failure(err, "Failed to write file"), err
 	}
 

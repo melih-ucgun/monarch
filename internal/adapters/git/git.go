@@ -70,7 +70,7 @@ func NewGitAdapter(name string, params map[string]interface{}) core.Resource {
 	}
 }
 
-func (r *GitAdapter) Validate() error {
+func (r *GitAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Repo == "" {
 		return fmt.Errorf("git repository url is required")
 	}
@@ -82,19 +82,19 @@ func (r *GitAdapter) Validate() error {
 
 func (r *GitAdapter) Check(ctx *core.SystemContext) (bool, error) {
 	if r.State == "absent" {
-		if _, err := os.Stat(r.Dest); !os.IsNotExist(err) {
+		if _, err := ctx.FS.Stat(r.Dest); !os.IsNotExist(err) {
 			return true, nil // Klasör var, silinmeli
 		}
 		return false, nil
 	}
 
 	// State == present
-	if _, err := os.Stat(r.Dest); os.IsNotExist(err) {
+	if _, err := ctx.FS.Stat(r.Dest); os.IsNotExist(err) {
 		return true, nil // Klasör yok, clone gerek
 	}
 
 	// Klasör var, burası bir git repo mu?
-	if !isGitRepo(r.Dest) {
+	if !r.isGitRepo(ctx, r.Dest) {
 		return false, fmt.Errorf("directory %s exists but is not a git repository", r.Dest)
 	}
 
@@ -172,7 +172,7 @@ func (r *GitAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 	}
 
 	if r.State == "absent" {
-		if err := os.RemoveAll(r.Dest); err != nil {
+		if err := ctx.FS.RemoveAll(r.Dest); err != nil {
 			return core.Failure(err, "Failed to remove directory"), err
 		}
 		return core.SuccessChange(fmt.Sprintf("Removed git repo at %s", r.Dest)), nil
@@ -181,12 +181,12 @@ func (r *GitAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 	// State == present
 
 	// Create parent dir
-	if err := os.MkdirAll(r.Dest, 0755); err != nil && !os.IsExist(err) {
+	if err := ctx.FS.MkdirAll(r.Dest, 0755); err != nil && !os.IsExist(err) {
 		return core.Failure(err, "Failed to create directory"), err
 	}
 
 	// Klasör yoksa Clone
-	if _, err := os.Stat(filepath.Join(r.Dest, ".git")); os.IsNotExist(err) {
+	if _, err := ctx.FS.Stat(filepath.Join(r.Dest, ".git")); os.IsNotExist(err) {
 		// Clone argümanları
 		args := []string{"clone", r.Repo, r.Dest}
 		if r.Branch != "" {
@@ -255,7 +255,7 @@ func (r *GitAdapter) Revert(ctx *core.SystemContext) error {
 	// Yeni klonlandıysa sil
 	if r.IsNew {
 		pterm.Warning.Printf("Reverting git clone: removing %s\n", r.Dest)
-		return os.RemoveAll(r.Dest)
+		return ctx.FS.RemoveAll(r.Dest)
 	}
 
 	// Update edildiyse eski SHA'ya dön
@@ -270,8 +270,8 @@ func (r *GitAdapter) Revert(ctx *core.SystemContext) error {
 
 // Helper Functions
 
-func isGitRepo(path string) bool {
-	_, err := os.Stat(filepath.Join(path, ".git"))
+func (r *GitAdapter) isGitRepo(ctx *core.SystemContext, path string) bool {
+	_, err := ctx.FS.Stat(filepath.Join(path, ".git"))
 	return err == nil
 }
 

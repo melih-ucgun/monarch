@@ -28,7 +28,7 @@ func NewYayAdapter(name string, params map[string]interface{}) core.Resource {
 	}
 }
 
-func (r *YayAdapter) Validate() error {
+func (r *YayAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Name == "" {
 		return fmt.Errorf("package name is required for yay")
 	}

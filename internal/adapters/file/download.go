@@ -44,7 +44,7 @@ func NewDownloadAdapter(name string, params map[string]interface{}) core.Resourc
 	}
 }
 
-func (r *DownloadAdapter) Validate() error {
+func (r *DownloadAdapter) Validate(ctx *core.SystemContext) error {
 	if r.URL == "" {
 		return fmt.Errorf("download url is required")
 	}
@@ -55,13 +55,10 @@ func (r *DownloadAdapter) Validate() error {
 }
 
 func (r *DownloadAdapter) Check(ctx *core.SystemContext) (bool, error) {
-	// Simple check: if file exists, assume it's good.
-	// TODO: meaningful check like ETag or Size or Hash?
-	if _, err := os.Stat(r.Dest); os.IsNotExist(err) {
+	info, err := ctx.FS.Stat(r.Dest)
+	if os.IsNotExist(err) {
 		return true, nil
 	}
-	// If exists, checks permissions?
-	info, err := os.Stat(r.Dest)
 	if err != nil {
 		return false, err
 	}
@@ -94,7 +91,7 @@ func (r *DownloadAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 	}
 
 	// Ensure dir exists
-	if err := os.MkdirAll(filepath.Dir(r.Dest), 0755); err != nil {
+	if err := ctx.FS.MkdirAll(filepath.Dir(r.Dest), 0755); err != nil {
 		return core.Failure(err, "Failed to create directory"), err
 	}
 
@@ -108,7 +105,7 @@ func (r *DownloadAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 		return core.Failure(nil, fmt.Sprintf("Download failed with status: %s", resp.Status)), fmt.Errorf("status %s", resp.Status)
 	}
 
-	out, err := os.Create(r.Dest)
+	out, err := ctx.FS.Create(r.Dest)
 	if err != nil {
 		return core.Failure(err, "Failed to create file"), err
 	}
@@ -119,7 +116,7 @@ func (r *DownloadAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 		return core.Failure(err, "Failed to write file"), err
 	}
 
-	if err := os.Chmod(r.Dest, r.Mode); err != nil {
+	if err := ctx.FS.Chmod(r.Dest, r.Mode); err != nil {
 		return core.Failure(err, "Failed to set permissions"), err
 	}
 
@@ -128,8 +125,8 @@ func (r *DownloadAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 
 func (r *DownloadAdapter) Revert(ctx *core.SystemContext) error {
 	if r.BackupPath != "" {
-		return copyFile(r.BackupPath, r.Dest, r.Mode)
+		return core.CopyFile(ctx.FS, r.BackupPath, r.Dest, r.Mode)
 	}
 	// Yedek yoksa yeni indirilmiştir, sil
-	return os.Remove(r.Dest)
+	return ctx.FS.Remove(r.Dest)
 }

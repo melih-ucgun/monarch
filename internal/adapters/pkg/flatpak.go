@@ -29,7 +29,7 @@ func NewFlatpakAdapter(name string, params map[string]interface{}) core.Resource
 	}
 }
 
-func (r *FlatpakAdapter) Validate() error {
+func (r *FlatpakAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Name == "" {
 		return fmt.Errorf("package name is required for flatpak")
 	}

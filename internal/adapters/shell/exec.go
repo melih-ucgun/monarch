@@ -43,7 +43,7 @@ func NewExecAdapter(name string, params map[string]interface{}) core.Resource {
 	}
 }
 
-func (r *ExecAdapter) Validate() error {
+func (r *ExecAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Command == "" {
 		return fmt.Errorf("command is required for exec resource")
 	}

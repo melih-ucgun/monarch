@@ -56,7 +56,7 @@ func NewArchiveAdapter(name string, params map[string]interface{}) core.Resource
 	}
 }
 
-func (r *ArchiveAdapter) Validate() error {
+func (r *ArchiveAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Source == "" {
 		return fmt.Errorf("archive source is required")
 	}
@@ -68,19 +68,16 @@ func (r *ArchiveAdapter) Validate() error {
 
 func (r *ArchiveAdapter) Check(ctx *core.SystemContext) (bool, error) {
 	// 1. Kaynak dosya var mı?
-	if _, err := os.Stat(r.Source); os.IsNotExist(err) {
+	if _, err := ctx.FS.Stat(r.Source); os.IsNotExist(err) {
 		return false, fmt.Errorf("archive source not found: %s", r.Source)
 	}
 
 	// 2. Hedef klasör var mı?
-	// Basit mantık: Hedef klasör yoksa arşiv açılmalı -> Değişiklik var (true)
-	// Daha gelişmiş mantık: Hedef klasör boş mu? İçinde belirli bir dosya var mı?
-	// Şimdilik sadece klasör varlığına bakıyoruz.
-	if _, err := os.Stat(r.Dest); os.IsNotExist(err) {
+	if _, err := ctx.FS.Stat(r.Dest); os.IsNotExist(err) {
 		return true, nil
 	}
 
-	// Hedef zaten varsa değişiklik yok varsayıyoruz (Force update logic'i eklenebilir)
+	// Hedef zaten varsa değişiklik yok varsayıyoruz
 	return false, nil
 }
 
@@ -98,15 +95,15 @@ func (r *ArchiveAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 	}
 
 	// Hedef klasörü oluştur
-	if err := os.MkdirAll(r.Dest, r.Mode); err != nil {
+	if err := ctx.FS.MkdirAll(r.Dest, r.Mode); err != nil {
 		return core.Failure(err, "Failed to create destination directory"), err
 	}
 
 	// Dosya uzantısına göre açma işlemi
 	if strings.HasSuffix(r.Source, ".zip") {
-		err = unzip(r.Source, r.Dest)
+		err = r.unzip(ctx, r.Source, r.Dest)
 	} else if strings.HasSuffix(r.Source, ".tar.gz") || strings.HasSuffix(r.Source, ".tgz") {
-		err = untar(r.Source, r.Dest)
+		err = r.untar(ctx, r.Source, r.Dest)
 	} else {
 		return core.Failure(nil, "Unsupported archive format"), fmt.Errorf("unsupported format: %s", r.Source)
 	}
@@ -118,34 +115,44 @@ func (r *ArchiveAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 	return core.SuccessChange(fmt.Sprintf("Archive extracted to %s", r.Dest)), nil
 }
 
-// --- Yardımcı Fonksiyonlar ---
+// --- Yardımcı Fonksiyonlar (FS uyumlu) ---
 
-func unzip(src, dest string) error {
-	r, err := zip.OpenReader(src)
+func (r *ArchiveAdapter) unzip(ctx *core.SystemContext, src, dest string) error {
+	file, err := ctx.FS.Open(src)
 	if err != nil {
 		return err
 	}
-	defer r.Close()
+	defer file.Close()
 
-	for _, f := range r.File {
+	info, err := file.Stat()
+	if err != nil {
+		return err
+	}
+
+	reader, err := zip.NewReader(file, info.Size())
+	if err != nil {
+		return err
+	}
+
+	for _, f := range reader.File {
 		fpath := filepath.Join(dest, f.Name)
 
-		// Zip Slip zafiyetini önle - Daha güvenli Rel kontrolü
+		// Zip Slip zafiyetini önle
 		rel, err := filepath.Rel(dest, fpath)
 		if err != nil || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || rel == ".." {
 			return fmt.Errorf("illegal file path: %s", fpath)
 		}
 
 		if f.FileInfo().IsDir() {
-			os.MkdirAll(fpath, os.ModePerm)
+			ctx.FS.MkdirAll(fpath, os.ModePerm)
 			continue
 		}
 
-		if err := os.MkdirAll(filepath.Dir(fpath), os.ModePerm); err != nil {
+		if err := ctx.FS.MkdirAll(filepath.Dir(fpath), os.ModePerm); err != nil {
 			return err
 		}
 
-		outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		outFile, err := ctx.FS.Create(fpath) // Create uses default O_TRUNC
 		if err != nil {
 			return err
 		}
@@ -157,23 +164,21 @@ func unzip(src, dest string) error {
 		}
 
 		_, err = io.Copy(outFile, rc)
-
-		// Ensure close errors are checked
-		closeErr := outFile.Close()
+		outFile.Close()
 		rc.Close()
 
 		if err != nil {
 			return err
 		}
-		if closeErr != nil {
-			return closeErr
-		}
+
+		// Set permissions
+		ctx.FS.Chmod(fpath, f.Mode())
 	}
 	return nil
 }
 
-func untar(src, dest string) error {
-	file, err := os.Open(src)
+func (r *ArchiveAdapter) untar(ctx *core.SystemContext, src, dest string) error {
+	file, err := ctx.FS.Open(src)
 	if err != nil {
 		return err
 	}
@@ -198,7 +203,7 @@ func untar(src, dest string) error {
 
 		target := filepath.Join(dest, header.Name)
 
-		// Zip Slip zafiyetini önle - Daha güvenli Rel kontrolü
+		// Zip Slip zafiyetini önle
 		rel, err := filepath.Rel(dest, target)
 		if err != nil || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || rel == ".." {
 			return fmt.Errorf("illegal file path: %s", target)
@@ -206,26 +211,26 @@ func untar(src, dest string) error {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(target, 0755); err != nil {
+			if err := ctx.FS.MkdirAll(target, 0755); err != nil {
 				return err
 			}
 		case tar.TypeReg, tar.TypeRegA:
-			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+			if err := ctx.FS.MkdirAll(filepath.Dir(target), 0755); err != nil {
 				return err
 			}
-			f, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(header.Mode))
+			f, err := ctx.FS.Create(target)
 			if err != nil {
 				return err
 			}
 			_, err = io.Copy(f, tr)
-			closeErr := f.Close()
+			f.Close()
 
 			if err != nil {
 				return err
 			}
-			if closeErr != nil {
-				return closeErr
-			}
+
+			// Set permissions
+			ctx.FS.Chmod(target, os.FileMode(header.Mode))
 		}
 	}
 	return nil

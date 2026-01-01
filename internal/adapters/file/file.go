@@ -65,7 +65,7 @@ func NewFileAdapter(name string, params map[string]interface{}) core.Resource {
 	}
 }
 
-func (r *FileAdapter) Validate() error {
+func (r *FileAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Path == "" {
 		return fmt.Errorf("file path is required")
 	}
@@ -82,7 +82,8 @@ func (r *FileAdapter) Validate() error {
 			return fmt.Errorf("cannot provide both 'source' and 'content' for file resource")
 		}
 		if r.Source != "" {
-			if _, err := os.Stat(r.Source); os.IsNotExist(err) {
+			// Source check - usually repo-side, but let's use ctx.FS if we assume a unified view
+			if _, err := ctx.FS.Stat(r.Source); os.IsNotExist(err) {
 				return fmt.Errorf("source file '%s' does not exist", r.Source)
 			}
 		}
@@ -95,7 +96,7 @@ func (r *FileAdapter) Validate() error {
 }
 
 func (r *FileAdapter) Check(ctx *core.SystemContext) (bool, error) {
-	info, err := os.Stat(r.Path)
+	info, err := ctx.FS.Stat(r.Path)
 
 	if r.State == "absent" {
 		// Dosya varsa silinmeli -> değişiklik var (true)
@@ -117,7 +118,7 @@ func (r *FileAdapter) Check(ctx *core.SystemContext) (bool, error) {
 
 	// İçerik kontrolü
 	if r.Content != "" {
-		existingContent, err := os.ReadFile(r.Path)
+		existingContent, err := ctx.FS.ReadFile(r.Path)
 		if err != nil {
 			return false, err
 		}
@@ -131,7 +132,7 @@ func (r *FileAdapter) Check(ctx *core.SystemContext) (bool, error) {
 				return true, nil // It's not a symlink
 			}
 
-			linkDest, err := os.Readlink(r.Path)
+			linkDest, err := ctx.FS.Readlink(r.Path)
 			if err != nil {
 				return false, err
 			}
@@ -140,27 +141,13 @@ func (r *FileAdapter) Check(ctx *core.SystemContext) (bool, error) {
 			absSource, _ := filepath.Abs(r.Source)
 			absDest, _ := filepath.Abs(linkDest)
 
-			// If link is relative, we might need to be careful.
-			// But Veto usually uses absolute paths or relative to repo root internally.
-			// The r.Source coming from config might be relative "files/.zshrc".
-			// But we expect 'apply' logic to resolve r.Source to absolute before calling Check?
-			// Or we assume r.Source is what the link SAYS.
-
-			// For robustness: if r.Source is relative, and linkDest is absolute, or vice versa...
-			// If r.Source is relative, it is usually relative to the config file location (repo root).
-			// Symlinks can point to relative paths too!
-			// BUT, our 'veto add' created an absolute symlink or relative?
-			// Code in add.go: os.Symlink(storageAbsPath, absTarget) -> storageAbsPath is absolute.
-			// So we check absolute equality.
-
 			if absDest != absSource {
-				// Try checking if they resolve to same file?
 				return true, nil
 			}
 		} else {
 			// Copy Mode
 			// Source ile hedefi karşılaştır
-			same, err := compareFiles(r.Source, r.Path)
+			same, err := r.compareFiles(ctx, r.Source, r.Path)
 			if err != nil {
 				return false, err
 			}
@@ -174,10 +161,10 @@ func (r *FileAdapter) Check(ctx *core.SystemContext) (bool, error) {
 
 func (r *FileAdapter) Diff(ctx *core.SystemContext) (string, error) {
 	if r.State == "absent" {
-		if _, err := os.Stat(r.Path); os.IsNotExist(err) {
+		if _, err := ctx.FS.Stat(r.Path); os.IsNotExist(err) {
 			return "", nil
 		}
-		current, _ := os.ReadFile(r.Path)
+		current, _ := ctx.FS.ReadFile(r.Path)
 		return core.GenerateDiff(r.Path, string(current), ""), nil
 	}
 
@@ -186,7 +173,7 @@ func (r *FileAdapter) Diff(ctx *core.SystemContext) (string, error) {
 	if r.Content != "" {
 		desired = r.Content
 	} else if r.Source != "" {
-		s, err := os.ReadFile(r.Source)
+		s, err := ctx.FS.ReadFile(r.Source)
 		if err != nil {
 			return "", err
 		}
@@ -194,8 +181,8 @@ func (r *FileAdapter) Diff(ctx *core.SystemContext) (string, error) {
 	}
 
 	current := ""
-	if _, err := os.Stat(r.Path); err == nil {
-		c, _ := os.ReadFile(r.Path)
+	if _, err := ctx.FS.Stat(r.Path); err == nil {
+		c, _ := ctx.FS.ReadFile(r.Path)
 		current = string(c)
 	}
 
@@ -227,7 +214,7 @@ func (r *FileAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 	}
 
 	if r.State == "absent" {
-		if err := os.Remove(r.Path); err != nil {
+		if err := ctx.FS.Remove(r.Path); err != nil {
 			return core.Failure(err, "Failed to delete file"), err
 		}
 		return core.SuccessChange("File deleted"), nil
@@ -235,27 +222,26 @@ func (r *FileAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 
 	// Dizin yoksa oluştur
 	dir := filepath.Dir(r.Path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := ctx.FS.MkdirAll(dir, 0755); err != nil {
 		return core.Failure(err, "Failed to create directory"), err
 	}
 
 	// İçerik yazma veya kopyalama
 	if r.Content != "" {
-		if err := os.WriteFile(r.Path, []byte(r.Content), r.Mode); err != nil {
+		if err := ctx.FS.WriteFile(r.Path, []byte(r.Content), r.Mode); err != nil {
 			return core.Failure(err, "Failed to write content"), err
 		}
 	} else if r.Source != "" {
 		if r.Method == "symlink" {
 			// Delete existing if present (since we confirmed it's wrong in Check)
-			os.Remove(r.Path)
+			ctx.FS.Remove(r.Path)
 
 			// Create symlink
-			// r.Source should be absolute path to the repo file
-			if err := os.Symlink(r.Source, r.Path); err != nil {
+			if err := ctx.FS.Symlink(r.Source, r.Path); err != nil {
 				return core.Failure(err, "Failed to create symlink"), err
 			}
 		} else {
-			if err := copyFile(r.Source, r.Path, r.Mode); err != nil {
+			if err := r.copyFile(ctx, r.Source, r.Path, r.Mode); err != nil {
 				return core.Failure(err, "Failed to copy file"), err
 			}
 		}
@@ -267,27 +253,25 @@ func (r *FileAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 func (r *FileAdapter) Revert(ctx *core.SystemContext) error {
 	if r.BackupPath != "" {
 		// Yedeği geri yükle
-		return copyFile(r.BackupPath, r.Path, r.Mode)
+		return r.copyFile(ctx, r.BackupPath, r.Path, r.Mode)
 	}
 
 	if r.State == "present" {
-		// Yedek yoksa ve dosya oluşturduysak, sil
-		// (Dosya önceden yoktu demek)
-		return os.Remove(r.Path)
+		return ctx.FS.Remove(r.Path)
 	}
 
 	return nil
 }
 
-// copyFile basit bir kopyalama fonksiyonu
-func copyFile(src, dst string, mode os.FileMode) error {
-	sourceFile, err := os.Open(src)
+// copyFile basitleştirilmiş kopyalama fonksiyonu (FS üzerinden)
+func (r *FileAdapter) copyFile(ctx *core.SystemContext, src, dst string, mode os.FileMode) error {
+	sourceFile, err := ctx.FS.Open(src)
 	if err != nil {
 		return err
 	}
 	defer sourceFile.Close()
 
-	destFile, err := os.Create(dst)
+	destFile, err := ctx.FS.Create(dst)
 	if err != nil {
 		return err
 	}
@@ -296,5 +280,18 @@ func copyFile(src, dst string, mode os.FileMode) error {
 	if _, err := io.Copy(destFile, sourceFile); err != nil {
 		return err
 	}
-	return os.Chmod(dst, mode)
+	return ctx.FS.Chmod(dst, mode)
+}
+
+// compareFiles logic moved to FileAdapter to use FS abstraction
+func (r *FileAdapter) compareFiles(ctx *core.SystemContext, src, dst string) (bool, error) {
+	s, err := ctx.FS.ReadFile(src)
+	if err != nil {
+		return false, err
+	}
+	d, err := ctx.FS.ReadFile(dst)
+	if err != nil {
+		return false, err
+	}
+	return string(s) == string(d), nil
 }

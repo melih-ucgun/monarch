@@ -25,8 +25,11 @@ type SystemContext struct {
 	// Çevresel Değişkenler
 	Env SystemEnv `yaml:"env"`
 
-	// Dosya Sistemi
-	FS SystemFS `yaml:"fs"`
+	// Dosya Sistemi Metadatası
+	FSInfo SystemFS `yaml:"fs"`
+
+	// Dosya Sistemi Soyutlaması (İşlemler)
+	FS FileSystem `yaml:"-"`
 
 	// Kullanıcı Bilgileri
 	User    string `yaml:"user"`     // Mevcut kullanıcı
@@ -61,7 +64,6 @@ type SystemFS struct {
 	RootFSType string `yaml:"root_fs_type"` // "ext4", "btrfs", "zfs"
 }
 
-// NewSystemContext, temel bir context oluşturur.
 func NewSystemContext(dryRun bool) *SystemContext {
 	return &SystemContext{
 		Context:    context.Background(),
@@ -73,6 +75,7 @@ func NewSystemContext(dryRun bool) *SystemContext {
 		DryRun:     dryRun,
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
+		FS:         &RealFS{}, // Devault to local filesystem
 		// Diğer alt structlar zero-value olarak başlar, detector tarafından doldurulur.
 	}
 }

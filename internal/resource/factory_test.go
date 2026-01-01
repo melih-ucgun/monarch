@@ -83,6 +83,11 @@ func TestCreateResourceWithParams(t *testing.T) {
 }
 
 func TestCreateResource_ContextAware(t *testing.T) {
+	// Mock IsCommandAvailable to return false for fallbacks
+	oldAvailable := core.IsCommandAvailable
+	core.IsCommandAvailable = func(name string) bool { return false }
+	defer func() { core.IsCommandAvailable = oldAvailable }()
+
 	tests := []struct {
 		distro   string
 		wantType string

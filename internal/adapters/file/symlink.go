@@ -48,7 +48,7 @@ func NewSymlinkAdapter(name string, params map[string]interface{}) core.Resource
 	}
 }
 
-func (r *SymlinkAdapter) Validate() error {
+func (r *SymlinkAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Link == "" || r.Target == "" {
 		return fmt.Errorf("symlink requires both 'path' (link) and 'target'")
 	}
@@ -56,7 +56,7 @@ func (r *SymlinkAdapter) Validate() error {
 }
 
 func (r *SymlinkAdapter) Check(ctx *core.SystemContext) (bool, error) {
-	info, err := os.Lstat(r.Link)
+	info, err := ctx.FS.Lstat(r.Link)
 
 	if r.State == "absent" {
 		return !os.IsNotExist(err), nil
@@ -75,7 +75,7 @@ func (r *SymlinkAdapter) Check(ctx *core.SystemContext) (bool, error) {
 	}
 
 	// Hedef doğru mu?
-	currentDest, err := os.Readlink(r.Link)
+	currentDest, err := ctx.FS.Readlink(r.Link)
 	if err != nil {
 		return true, err
 	}
@@ -96,9 +96,9 @@ func (r *SymlinkAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 		return core.SuccessChange(fmt.Sprintf("[DryRun] Link %s -> %s (Force: %v)", r.Link, r.Target, r.Force)), nil
 	}
 
-	// Eğer dosya varsa ve force ise sil (veya link ise güncellemek için sil)
-	if _, err := os.Lstat(r.Link); err == nil {
-		if err := os.Remove(r.Link); err != nil {
+	// Eğer dosya varsa ve force ise sil
+	if _, err := ctx.FS.Lstat(r.Link); err == nil {
+		if err := ctx.FS.Remove(r.Link); err != nil {
 			return core.Failure(err, "Failed to remove existing path"), err
 		}
 	}
@@ -108,11 +108,11 @@ func (r *SymlinkAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 	}
 
 	// Klasörü oluştur
-	if err := os.MkdirAll(filepath.Dir(r.Link), 0755); err != nil {
+	if err := ctx.FS.MkdirAll(filepath.Dir(r.Link), 0755); err != nil {
 		return core.Failure(err, "Failed to create parent dir"), err
 	}
 
-	if err := os.Symlink(r.Target, r.Link); err != nil {
+	if err := ctx.FS.Symlink(r.Target, r.Link); err != nil {
 		return core.Failure(err, "Failed to create symlink"), err
 	}
 

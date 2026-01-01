@@ -66,7 +66,7 @@ func NewUserAdapter(name string, params map[string]interface{}) core.Resource {
 	}
 }
 
-func (r *UserAdapter) Validate() error {
+func (r *UserAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Name == "" {
 		return fmt.Errorf("username is required")
 	}

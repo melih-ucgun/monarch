@@ -64,6 +64,6 @@ func (a *Adapter) GetType() string {
 	return "bundle"
 }
 
-func (a *Adapter) Validate() error {
+func (a *Adapter) Validate(ctx *core.SystemContext) error {
 	return nil
 }

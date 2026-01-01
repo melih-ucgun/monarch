@@ -29,7 +29,7 @@ func (m *MockResource) Check(ctx *SystemContext) (bool, error) {
 	return true, nil // Always true for tests unless specified
 }
 
-func (m *MockResource) Validate() error {
+func (m *MockResource) Validate(ctx *SystemContext) error {
 	return nil
 }
 
@@ -53,7 +53,7 @@ func (m *MockStateUpdater) UpdateResource(resType, name, targetState, status str
 }
 
 func TestEngine_RunParallel(t *testing.T) {
-	ctx := &SystemContext{DryRun: false}
+	ctx := NewSystemContext(false)
 
 	t.Run("All success", func(t *testing.T) {
 		engine := NewEngine(ctx, nil)

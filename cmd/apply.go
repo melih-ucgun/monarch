@@ -93,7 +93,7 @@ func runApply(configFile string, isDryRun bool, skipSnapshot bool, isPrune bool)
 	// Check if we should attempt a snapshot
 	if !isDryRun && !skipSnapshot {
 		// NewManager akıllıca seçim yapar (Snapper > Timeshift)
-		snapMgr = snapshot.NewManager(ctx.FS.RootFSType)
+		snapMgr = snapshot.NewManager(ctx.FSInfo.RootFSType)
 
 		if snapMgr != nil && snapMgr.IsAvailable() {
 			pterm.Info.Printf("Snapshot System: %s detected\n", snapMgr.ProviderName())
@@ -122,7 +122,7 @@ func runApply(configFile string, isDryRun bool, skipSnapshot bool, isPrune bool)
 		{"RAM", ctx.Hardware.RAMTotal},
 		{"GPU", fmt.Sprintf("%s %s", ctx.Hardware.GPUVendor, ctx.Hardware.GPUModel)},
 		{"Shell", ctx.Env.Shell},
-		{"FS", ctx.FS.RootFSType},
+		{"FS", ctx.FSInfo.RootFSType},
 		{"Time", time.Now().Format("15:04:05")},
 	}
 	pterm.DefaultTable.WithHasHeader(false).WithData(sysInfo).Render()

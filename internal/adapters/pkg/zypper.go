@@ -28,7 +28,7 @@ func NewZypperAdapter(name string, params map[string]interface{}) core.Resource 
 	}
 }
 
-func (r *ZypperAdapter) Validate() error {
+func (r *ZypperAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Name == "" {
 		return fmt.Errorf("package name is required for zypper")
 	}

@@ -29,7 +29,7 @@ func NewAptAdapter(name string, params map[string]interface{}) core.Resource {
 	}
 }
 
-func (r *AptAdapter) Validate() error {
+func (r *AptAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Name == "" {
 		return fmt.Errorf("package name is required")
 	}

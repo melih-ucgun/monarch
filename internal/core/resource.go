@@ -5,7 +5,7 @@ package core
 type Resource interface {
 	Apply(ctx *SystemContext) (Result, error)
 	Check(ctx *SystemContext) (bool, error)
-	Validate() error
+	Validate(ctx *SystemContext) error
 	GetName() string
 	GetType() string
 }

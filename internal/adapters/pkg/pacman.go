@@ -32,7 +32,7 @@ func NewPacmanAdapter(name string, params map[string]interface{}) core.Resource 
 	}
 }
 
-func (r *PacmanAdapter) Validate() error {
+func (r *PacmanAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Name == "" {
 		return fmt.Errorf("package name is required")
 	}

@@ -40,7 +40,7 @@ func RunCommand(name string, args ...string) (string, error) {
 }
 
 // IsCommandAvailable, bir komutun sistemde yüklü olup olmadığını kontrol eder.
-func IsCommandAvailable(name string) bool {
+var IsCommandAvailable = func(name string) bool {
 	_, err := exec.LookPath(name)
 	return err == nil
 }

@@ -51,7 +51,7 @@ func NewTemplateAdapter(name string, params map[string]interface{}) core.Resourc
 	}
 }
 
-func (r *TemplateAdapter) Validate() error {
+func (r *TemplateAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Src == "" {
 		return fmt.Errorf("template source 'src' is required")
 	}
@@ -60,7 +60,7 @@ func (r *TemplateAdapter) Validate() error {
 	}
 
 	// Template dosyasının varlığını kontrol et
-	if _, err := os.Stat(r.Src); os.IsNotExist(err) {
+	if _, err := ctx.FS.Stat(r.Src); os.IsNotExist(err) {
 		return fmt.Errorf("template source file '%s' does not exist", r.Src)
 	}
 
@@ -69,17 +69,17 @@ func (r *TemplateAdapter) Validate() error {
 
 func (r *TemplateAdapter) Check(ctx *core.SystemContext) (bool, error) {
 	// 1. Hedef dosya yoksa -> Değişiklik var
-	if _, err := os.Stat(r.Dest); os.IsNotExist(err) {
+	if _, err := ctx.FS.Stat(r.Dest); os.IsNotExist(err) {
 		return true, nil
 	}
 
 	// 2. İçerik kontrolü: Template'i bellekte render et ve mevcut dosyayla karşılaştır
-	rendered, err := r.render()
+	rendered, err := r.render(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to render template for check: %w", err)
 	}
 
-	currentContent, err := os.ReadFile(r.Dest)
+	currentContent, err := ctx.FS.ReadFile(r.Dest)
 	if err != nil {
 		return false, err
 	}
@@ -91,14 +91,14 @@ func (r *TemplateAdapter) Check(ctx *core.SystemContext) (bool, error) {
 }
 
 func (r *TemplateAdapter) Diff(ctx *core.SystemContext) (string, error) {
-	rendered, err := r.render()
+	rendered, err := r.render(ctx)
 	if err != nil {
 		return "", err
 	}
 
 	current := ""
-	if _, err := os.Stat(r.Dest); err == nil {
-		c, _ := os.ReadFile(r.Dest)
+	if _, err := ctx.FS.Stat(r.Dest); err == nil {
+		c, _ := ctx.FS.ReadFile(r.Dest)
 		current = string(c)
 	}
 
@@ -127,18 +127,18 @@ func (r *TemplateAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 	}
 
 	// Render et
-	content, err := r.render()
+	content, err := r.render(ctx)
 	if err != nil {
 		return core.Failure(err, "Template render failed"), err
 	}
 
 	// Klasörü oluştur
-	if err := os.MkdirAll(filepath.Dir(r.Dest), 0755); err != nil {
+	if err := ctx.FS.MkdirAll(filepath.Dir(r.Dest), 0755); err != nil {
 		return core.Failure(err, "Failed to create directory"), err
 	}
 
 	// Yaz
-	if err := os.WriteFile(r.Dest, []byte(content), r.Mode); err != nil {
+	if err := ctx.FS.WriteFile(r.Dest, []byte(content), r.Mode); err != nil {
 		return core.Failure(err, "Failed to write file"), err
 	}
 
@@ -147,14 +147,14 @@ func (r *TemplateAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 
 func (r *TemplateAdapter) Revert(ctx *core.SystemContext) error {
 	if r.BackupPath != "" {
-		return copyFile(r.BackupPath, r.Dest, r.Mode)
+		return core.CopyFile(ctx.FS, r.BackupPath, r.Dest, r.Mode)
 	}
-	return os.Remove(r.Dest)
+	return ctx.FS.Remove(r.Dest)
 }
 
-func (r *TemplateAdapter) render() (string, error) {
+func (r *TemplateAdapter) render(ctx *core.SystemContext) (string, error) {
 	// Template dosyasını oku
-	tmplContent, err := os.ReadFile(r.Src)
+	tmplContent, err := ctx.FS.ReadFile(r.Src)
 	if err != nil {
 		return "", err
 	}

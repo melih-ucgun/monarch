@@ -49,7 +49,7 @@ func NewGroupAdapter(name string, params map[string]interface{}) core.Resource {
 	}
 }
 
-func (r *GroupAdapter) Validate() error {
+func (r *GroupAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Name == "" {
 		return fmt.Errorf("group name is required")
 	}

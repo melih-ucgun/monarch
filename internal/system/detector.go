@@ -60,7 +60,7 @@ func Detect(dryRun bool) *core.SystemContext {
 	ctx.Env = detectEnv()
 
 	// 5. Dosya Sistemi
-	ctx.FS = detectFS("/")
+	ctx.FSInfo = detectFS("/")
 
 	return ctx
 }

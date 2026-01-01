@@ -28,7 +28,7 @@ func NewSnapAdapter(name string, params map[string]interface{}) core.Resource {
 	}
 }
 
-func (r *SnapAdapter) Validate() error {
+func (r *SnapAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Name == "" {
 		return fmt.Errorf("package name is required for snap")
 	}

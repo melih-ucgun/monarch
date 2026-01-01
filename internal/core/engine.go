@@ -34,7 +34,7 @@ type Engine struct {
 // NewEngine creates a new engine instance.
 func NewEngine(ctx *SystemContext, updater StateUpdater) *Engine {
 	// Initialize Backup Manager
-	_ = InitBackupManager() // Ignore error for now (or log)
+	_ = InitBackupManager(ctx.FS) // Ignore error for now (or log)
 	return &Engine{
 		Context:      ctx,
 		StateUpdater: updater,
@@ -72,7 +72,7 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 		}
 
 		// 1.5 Validate resource configuration
-		if err := res.Validate(); err != nil {
+		if err := res.Validate(e.Context); err != nil {
 			pterm.Error.Printf("[%s] Validation Failed: %v\n", item.Name, err)
 			errCount++
 			continue
@@ -208,7 +208,7 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 			}
 
 			// 1.5 Validate resource configuration
-			if err := res.Validate(); err != nil {
+			if err := res.Validate(e.Context); err != nil {
 				pterm.Error.Printf("[%s] Validation Failed: %v\n", it.Name, err)
 				errChan <- err
 				return
@@ -374,7 +374,7 @@ func (e *Engine) Plan(items []ConfigItem, createFn ResourceCreator) (*PlanResult
 		}
 
 		// 1.5 Validate resource configuration
-		if err := resApp.Validate(); err != nil {
+		if err := resApp.Validate(e.Context); err != nil {
 			return nil, fmt.Errorf("[%s] Validation Error: %w", item.Name, err)
 		}
 
