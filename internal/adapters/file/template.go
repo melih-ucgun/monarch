@@ -78,8 +78,22 @@ func (r *TemplateAdapter) Check(ctx *core.SystemContext) (bool, error) {
 	if string(currentContent) != rendered {
 		return true, nil
 	}
-
 	return false, nil
+}
+
+func (r *TemplateAdapter) Diff(ctx *core.SystemContext) (string, error) {
+	rendered, err := r.render()
+	if err != nil {
+		return "", err
+	}
+
+	current := ""
+	if _, err := os.Stat(r.Dest); err == nil {
+		c, _ := os.ReadFile(r.Dest)
+		current = string(c)
+	}
+
+	return core.GenerateDiff(r.Dest, current, rendered), nil
 }
 
 func (r *TemplateAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {

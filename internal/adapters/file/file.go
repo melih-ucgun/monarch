@@ -150,8 +150,37 @@ func (r *FileAdapter) Check(ctx *core.SystemContext) (bool, error) {
 			}
 		}
 	}
-
 	return false, nil
+}
+
+func (r *FileAdapter) Diff(ctx *core.SystemContext) (string, error) {
+	if r.State == "absent" {
+		if _, err := os.Stat(r.Path); os.IsNotExist(err) {
+			return "", nil
+		}
+		current, _ := os.ReadFile(r.Path)
+		return core.GenerateDiff(r.Path, string(current), ""), nil
+	}
+
+	// For "present"
+	var desired string
+	if r.Content != "" {
+		desired = r.Content
+	} else if r.Source != "" {
+		s, err := os.ReadFile(r.Source)
+		if err != nil {
+			return "", err
+		}
+		desired = string(s)
+	}
+
+	current := ""
+	if _, err := os.Stat(r.Path); err == nil {
+		c, _ := os.ReadFile(r.Path)
+		current = string(c)
+	}
+
+	return core.GenerateDiff(r.Path, current, desired), nil
 }
 
 func (r *FileAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {

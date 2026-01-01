@@ -321,7 +321,7 @@ type PlanChange struct {
 	Type   string
 	Name   string
 	Action string // "create", "modify", "noop"
-	Diff   string // Optional detailed diff
+	Diff   string // Detailed diff for files/templates
 }
 
 // Plan generates a preview of changes without applying them.
@@ -373,6 +373,12 @@ func (e *Engine) Plan(items []ConfigItem, createFn ResourceCreator) (*PlanResult
 
 			if needsAction {
 				action = "apply"
+				// If it supports Diff, get detailed changes
+				if differ, ok := resApp.(Differ); ok {
+					if d, err := differ.Diff(e.Context); err == nil {
+						diff = d
+					}
+				}
 			} else {
 				action = "noop"
 			}

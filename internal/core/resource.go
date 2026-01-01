@@ -10,6 +10,11 @@ type Resource interface {
 	GetType() string
 }
 
+// Differ is the interface for resources that can provide a diff of changes.
+type Differ interface {
+	Diff(ctx *SystemContext) (string, error)
+}
+
 // Revertable is the interface that revertible resources must implement.
 type Revertable interface {
 	Revert(ctx *SystemContext) error
