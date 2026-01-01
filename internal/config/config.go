@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/melih-ucgun/veto/internal/crypto"
+	"github.com/pterm/pterm"
 )
 
 // Config represents the root structure of veto.yaml.
@@ -324,5 +325,27 @@ func getMasterKey() string {
 			return string(content)
 		}
 	}
+
+	// 3. Interactive Prompt
+	// Only if stdin is a terminal (interactive session)
+	if isInteractive() {
+		// Use pterm to ask for password
+		pterm.Println()
+		pterm.Warning.Println("Encrypted content detected but VETO_MASTER_KEY not found.")
+		key, err := pterm.DefaultInteractiveTextInput.
+			WithMask("*").
+			WithDefaultText("Enter Master Key for decryption").
+			Show()
+
+		if err == nil && key != "" {
+			return key
+		}
+	}
+
 	return ""
+}
+
+func isInteractive() bool {
+	fileInfo, _ := os.Stdin.Stat()
+	return (fileInfo.Mode() & os.ModeCharDevice) != 0
 }
