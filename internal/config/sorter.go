@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -56,17 +57,27 @@ func SortResources(resources []ResourceConfig) ([][]ResourceConfig, error) {
 
 	for len(queue) > 0 {
 		var nextLayer []string
-		var currentLayerConfigs []ResourceConfig
 
 		// Current queue represents a layer (parallelizable)
 		// However, standard Kahn algorithm proceeds node by node.
 		// To create parallel layers, we must "freeze" and process the current queue.
 
+		// Prepare configs for sorting
+		var currentQueueConfigs []ResourceConfig
+		for _, id := range queue {
+			currentQueueConfigs = append(currentQueueConfigs, resourceMap[id])
+		}
+
+		// Sort by Priority DESC
+		sort.SliceStable(currentQueueConfigs, func(i, j int) bool {
+			return currentQueueConfigs[i].Priority > currentQueueConfigs[j].Priority
+		})
+
+		// Process graph updates for the entire queue (to find next topological layer)
 		layerSize := len(queue)
 		for i := 0; i < layerSize; i++ {
 			node := queue[i]
 			processedCount++
-			currentLayerConfigs = append(currentLayerConfigs, resourceMap[node])
 
 			// Decrease degree of dependants
 			for _, neighbour := range graph[node] {
@@ -77,8 +88,24 @@ func SortResources(resources []ResourceConfig) ([][]ResourceConfig, error) {
 			}
 		}
 
-		layers = append(layers, currentLayerConfigs)
-		queue = nextLayer // Proceed to next layer
+		// Create Sub-Layers based on Priority
+		if len(currentQueueConfigs) > 0 {
+			currentPrio := currentQueueConfigs[0].Priority
+			var subLayer []ResourceConfig
+
+			for _, res := range currentQueueConfigs {
+				if res.Priority != currentPrio {
+					layers = append(layers, subLayer)
+					subLayer = []ResourceConfig{}
+					currentPrio = res.Priority
+				}
+				subLayer = append(subLayer, res)
+			}
+			// Append final sub-layer
+			layers = append(layers, subLayer)
+		}
+
+		queue = nextLayer // Proceed to next topological layer
 	}
 
 	// 4. Cycle check

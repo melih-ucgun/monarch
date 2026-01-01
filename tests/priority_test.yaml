@@ -1,0 +1,12 @@
+resources:
+  - type: bundle
+    name: "High Priority Task"
+    priority: 100
+
+  - type: bundle
+    name: "Medium Priority Task"
+    priority: 50
+
+  - type: bundle
+    name: "Low Priority Task"
+    priority: 0

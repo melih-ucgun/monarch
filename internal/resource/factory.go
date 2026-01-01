@@ -93,8 +93,7 @@ func CreateResourceWithParams(resType string, name string, params map[string]int
 
 	// Bundle
 	case "bundle":
-		// Recursively pass this factory function
-		return bundle.NewBundleAdapter(name, params, CreateResourceWithParams), nil
+		return bundle.New(name), nil
 
 	default:
 		return nil, fmt.Errorf("unknown resource type: %s", resType)

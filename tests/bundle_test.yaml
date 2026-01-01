@@ -1,0 +1,12 @@
+resources:
+  - type: bundle
+    name: "My Development Bundle"
+    depends_on:
+      - "file:test_file"
+
+  - type: file
+    name: "test_file"
+    params:
+      path: "/tmp/veto_bundle_test.txt"
+      state: "present"
+      content: "Bundle works!"
