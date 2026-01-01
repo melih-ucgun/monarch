@@ -1,162 +1,114 @@
 # 👑 Veto
 
 > **The Sovereign System Orchestrator**
-> _"Don't just manage your OS. Rule it."_
+> _"Rule your system through declarative architecture."_
 
-**Veto** transforms Linux system management from a chaotic, irreversible process into a **modular, self-healing Lego experience**. It treats your system not as a monolithic entity, but as a collection of attachable and detachable **Profiles**.
+**Veto** is an experimental system orchestrator designed to transform chaotic Linux management into a **declarative, state-driven experience**. It treats your OS as a collection of modular **Profiles**, allowing you to define, apply, and monitor your system state using simple YAML.
 
-Whether you are running a minimal setup with Hyprland on Arch or a server fleet on Fedora, Veto gives you the power of immutable systems with the flexibility of a rolling release.
+Veto aims to provide the declarative power of NixOS with the flexibility of a traditional rolling-release distribution like Arch or Fedora.
+
+> [!WARNING]
+> **Experimental (Alpha Stage):** Veto is currently in active development. While core features like file management and system discovery are stable, advanced features like automatic package rollback are experimental. Always back up your data.
 
 ---
 
-## ⚡ The Problem
+## ⚡ The Philosophy
 
-Modern Linux setups are fragmented. You install a package with `pacman`, manage configs with `stow`, enable services with `systemctl`, and fix permissions manually. **One change makes the system "dirty," and undoing it becomes nearly impossible.**
+Modern Linux setups suffer from **"System Drift."** Manual changes via `pacman`, `dotfile` symlinks, and `systemctl` make a system "dirty" over time. 
 
-Veto solves this by providing a unified, context-aware interface for all system resources.
+Veto's goal is to become the **Single Source of Truth** for:
+1. **Packages** (Cross-distro management)
+2. **Configurations** (Templates & Symlinks)
+3. **Services** (Lifecycle management)
+4. **Secrets** (Encrypted sensitive data)
+
+---
 
 ## 🆚 Veto vs. The Ecosystem
 
-| **Feature** | **👑 Veto** | **❄️ NixOS** | **🐍 Ansible** | **📂 Chezmoi / Stow** |
+| **Feature** | **👑 Veto** | **❄️ NixOS** | **🐍 Ansible** | **📂 Chezmoi** |
 | :--- | :--- | :--- | :--- | :--- |
-| **Primary Goal** | Modular Desktop Orchestration | Reproducible OS | Server Configuration | Dotfile Management |
-| **"Undo" Button** | ✅ **Native** (Atomic Revert + BTRFS) | ⚠️ Rollback (Whole OS) | ❌ Manual Playbooks | ❌ None |
-| **OS Requirement** | Any (Arch, Fedora, Debian, etc.) | Must use NixOS | Any | Any |
-| **Scope** | Pkgs + Configs + Svcs + Secrets | Everything | Everything | Config Files Only |
-| **Drift Detection** | ✅ **Auto-Repair** | ⚠️ Read-only Store | ❌ Overwrite on run | ❌ Overwrite on run |
-| **Learning Curve** | 🟢 **Low** (Simple YAML) | 🔴 Very High | 🟡 Medium | 🟢 Low |
+| **Approach** | Declarative + Distro Agnostic | Entire OS Reconstruction | Remote Configuration | Dotfile Only |
+| **Stability** | Distro Base + Atomic Snaps | Immutable Hash-based | Procedural | None |
+| **State Tracking** | ✅ JSON-based Tracking | ✅ Nix Store | ❌ Manual | ❌ None |
+| **BTRFS Rollback** | ✅ Integrated (Optional) | ✅ Native | ❌ No | ❌ No |
+| **Learning Curve** | 🟢 Low (YAML) | 🔴 Very High | 🟡 Medium | 🟢 Low |
 
 ---
 
-## 🚀 Current Features
+## 🚀 Current Capabilities
 
-### 1. **Context-Aware Intelligence**
-Veto analyzes your hardware (CPU, GPU), distribution, and environment variables. It can intelligently select the right drivers and configurations based on your system's "personality."
+### 1. **Context-Aware System Awareness**
+Instead of static scripts, Veto detects your hardware (CPU, GPU) and distribution details. These details are injected into templates, allowing you to create one config that works on both your AMD laptop and NVIDIA workstation.
 
-### 2. **System Discovery & Import**
-Moving from a "dirty" system to Veto is easy. The `veto import` command scans your installed packages, enabled services, and common configuration files, generating a baseline YAML for you.
+### 2. **Baseline Discovery & Import**
+Moving to Veto is not a manual task. Running `veto import` scans your current system state—explicitly installed packages and active services—and generates a baseline configuration to help you migrate.
 
-### 3. **Secret Management**
-Veto has built-in encryption for sensitive values. Generate a master key and use `veto secret encrypt` to store passwords or tokens securely in your configuration files.
+### 3. **Live Watch & Iteration**
+Designed for power users, `veto watch` monitors your configuration files. When you save a change, Veto automatically synchronizes the system—perfect for iterative styling of your desktop environment or testing new service configs.
 
-### 4. **Atomic Snapshots & Rollback**
-Before applying changes, Veto can automatically create BTRFS snapshots (via Snapper or Timeshift). If something goes wrong, you can `veto rollback` to return to the exact state before the operation.
+### 4. **Built-in Secret Management**
+Handle sensitive data without leaking it. Veto provides a native encryption layer using a master key, allowing you to store encrypted strings directly in your Git-tracked YAML files.
 
-### 5. **Live Watch Mode**
-Run `veto watch` to monitor your configuration files. As soon as you save a change, Veto automatically applies it to your system—perfect for iterative styling of your desktop environment.
-
-### 6. **Comprehensive Resource Support**
-Veto is powered by a modular adapter system supporting:
-- **Package Managers:** 13+ managers including `pacman`, `yay`, `apt`, `dnf`, `brew`, `flatpak`, `snap`, etc.
-- **Service Managers:** `systemd`, `openrc`, `sysvinit`.
-- **Identity Management:** `user` and `group` creation and modification.
-- **Filesystem:** Templates, symlinks, line-in-file edits, and archive extraction.
-- **Automation:** Git repository management and custom shell execution.
+### 5. **Atomic Hook (BTRFS)**
+When running on BTRFS, Veto can automatically trigger `snapper` or `timeshift` snapshots before applying changes. This provides an external safety net beyond Veto's internal state tracking.
 
 ---
 
-## 🏗️ Supported Adapters
+## 🏗️ Supported Adapters (Overview)
 
-Veto is designed to be distro-agnostic. It currently supports:
+Veto uses a modular adapter system to talk to your OS components:
 
-| Category | Supported Technologies / Types |
-| :--- | :--- |
-| **Pkg Managers** | `pacman`, `yay`, `paru`, `apt`, `dnf`, `yum`, `zypper`, `brew`, `apk`, `flatpak`, `snap` |
-| **Services** | `systemd`, `openrc`, `sysvinit` |
-| **Files** | `file` (create/delete), `symlink`, `template` (Go templates), `line_in_file`, `archive`, `download` |
-| **System** | `user`, `group`, `git`, `shell` (exec) |
-| **Snapshots** | `snapper`, `timeshift` (BTRFS) |
+- **Package Managers:** `pacman`, `yay`, `paru`, `apt`, `dnf`, `yum`, `zypper`, `brew`, `apk`, `flatpak`, `snap`.
+- **Init Systems:** `systemd`, `openrc`, `sysvinit`.
+- **Filesystem:** Templates (Go-style), Symlinks, Line-in-file, Archives.
+- **Automation:** Git integration, User/Group management, Shell execution.
 
 ---
 
-## 📦 Installation & Quick Start
+## 📦 Quick Start
 
-Veto is a single binary written in Go. No external dependencies are required for the core engine.
-
-### 1. Initialize System Context
-This scans your hardware and OS to configure the local registry.
+### 1. Initialize Context
 ```bash
 veto init
 ```
 
-### 2. Import Current State (The "Sovereign" Path)
-Discovers your current setup and creates a baseline configuration.
+### 2. Discover Your System
 ```bash
 veto import my-system.yaml
 ```
 
-### 3. Apply Configuration
-Ensure your system state matches your YAML definition.
+### 3. Apply & Watch
 ```bash
-# Preview changes first
+# Preview changes
 veto apply my-system.yaml --dry-run
 
-# Apply for real (automatically creates a snapshot)
+# Apply and track state
 veto apply my-system.yaml
-```
 
-### 4. Watch for Changes
-Iterate on your setup in real-time.
-```bash
+# Hot-reload on file change
 veto watch my-system.yaml
 ```
 
 ---
 
-## 🛠️ Configuration Example
+## �️ Roadmap & Stability
 
-```yaml
-# my-system.yaml
-resources:
-  - name: base-packages
-    type: pkg
-    params:
-      names: [git, curl, vim]
-      state: present
-
-  - name: enable-docker
-    type: service
-    name: docker
-    state: running
-    params:
-      enabled: true
-    depends_on: [pkg:docker]
-
-  - name: dotfiles
-    type: git
-    params:
-      url: "https://github.com/user/dotfiles.git"
-      path: "/home/user/.dotfiles"
-
-  - name: zshrc
-    type: symlink
-    params:
-      source: "/home/user/.dotfiles/.zshrc"
-      target: "/home/user/.zshrc"
-```
-
----
-
-## 🗺️ Roadmap
-
-- [x] **Core Engine:** Resource adapters, State management, Undo logic.
-- [x] **System Awareness:** Auto-detection of Hardware/OS.
-- [x] **Secrets System:** Built-in encryption for sensitive data.
-- [x] **Import/Export:** System discovery for easy migration.
-- [ ] **Veto Hub:** A decentralized registry for sharing rulesets.
-- [ ] **Veto Studio:** A GUI Dashboard for visual system orchestration.
+| Feature | Status | Description |
+| :--- | :--- | :--- |
+| **State Tracking** | ✅ Stable | JSON-based tracking of applied resources. |
+| **File/Template** | ✅ Stable | Declarative file management and symlinking. |
+| **Secrets** | ✅ Stable | AES encryption for sensitive YAML values. |
+| **Discovery** | 🟡 Beta | Accurate for Arch/Debian; generic for others. |
+| **Rollback** | 🟡 Experimental | File restoration is stable; Pkg revert is WIP. |
+| **Hub** | ⏳ Planned | Community registry for sharing profiles/rulesets. |
+| **Veto Studio** | 🔮 Vision | GUI dashboard for visual orchestration. |
 
 ---
 
 ## 🤝 Contributing
 
-Veto is community-driven. We welcome contributions to adapters, core logic, or the upcoming Hub.
-
-1. Fork the Project.
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`).
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`).
-4. Push to the Branch (`git push origin feature/AmazingFeature`).
-5. Open a Pull Request.
+We are building a community-driven tool. Check the `issues` page for tasks related to resource adapters or core engine optimization.
 
 ---
 
@@ -165,4 +117,4 @@ Veto is community-driven. We welcome contributions to adapters, core logic, or t
 Distributed under the Apache 2.0 License. See `LICENSE` for more information.
 
 **Veto** © 2025 Developed by **Melih Uçgun**
-_"We don't just configure systems—we build sovereign infrastructure."_
+_"Infrastructure is sovereignty."_
