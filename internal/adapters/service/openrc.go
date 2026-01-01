@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/melih-ucgun/veto/internal/core"
 )
 
 type OpenRCManager struct{}
@@ -20,13 +22,13 @@ func (s *OpenRCManager) IsEnabled(service string) (bool, error) {
 	// rc-update show default | grep service
 	// This is a bit loose, but standard for OpenRC
 	cmd := exec.Command("rc-update", "show", "default")
-	out, _ := cmd.CombinedOutput()
+	out, _ := core.CommandRunner.CombinedOutput(cmd)
 	return strings.Contains(string(out), service), nil
 }
 
 func (s *OpenRCManager) IsActive(service string) (bool, error) {
 	cmd := exec.Command("rc-service", service, "status")
-	err := cmd.Run()
+	err := core.CommandRunner.Run(cmd)
 	// rc-service returns 0 if started, non-zero if stopped
 	return err == nil, nil
 }
@@ -57,7 +59,7 @@ func (s *OpenRCManager) Reload(service string) error {
 
 func (s *OpenRCManager) runService(service string, action string) error {
 	cmd := exec.Command("rc-service", service, action)
-	if out, err := cmd.CombinedOutput(); err != nil {
+	if out, err := core.CommandRunner.CombinedOutput(cmd); err != nil {
 		return fmt.Errorf("rc-service %s %s failed: %s: %w", service, action, string(out), err)
 	}
 	return nil
@@ -65,7 +67,7 @@ func (s *OpenRCManager) runService(service string, action string) error {
 
 func (s *OpenRCManager) runUpdate(action, service, runlevel string) error {
 	cmd := exec.Command("rc-update", action, service, runlevel)
-	if out, err := cmd.CombinedOutput(); err != nil {
+	if out, err := core.CommandRunner.CombinedOutput(cmd); err != nil {
 		return fmt.Errorf("rc-update %s %s %s failed: %s: %w", action, service, runlevel, string(out), err)
 	}
 	return nil

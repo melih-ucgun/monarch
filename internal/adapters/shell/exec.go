@@ -7,6 +7,12 @@ import (
 	"github.com/melih-ucgun/veto/internal/core"
 )
 
+func init() {
+	core.RegisterResource("exec", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewExecAdapter(name, params), nil
+	})
+}
+
 type ExecAdapter struct {
 	core.BaseResource
 	Command       string
@@ -15,7 +21,7 @@ type ExecAdapter struct {
 	RevertCommand string // Rollback durumunda çalıştırılacak komut
 }
 
-func NewExecAdapter(name string, params map[string]interface{}) *ExecAdapter {
+func NewExecAdapter(name string, params map[string]interface{}) core.Resource {
 	cmd, _ := params["command"].(string)
 	if cmd == "" {
 		cmd = name
@@ -44,7 +50,8 @@ func (r *ExecAdapter) Validate() error {
 func (r *ExecAdapter) Check(ctx *core.SystemContext) (bool, error) {
 	// 1. Unless Kontrolü: Eğer başarılı olursa, çalışmaya GEREK YOK (return false)
 	if r.Unless != "" {
-		err := exec.Command("sh", "-c", r.Unless).Run()
+		cmd := exec.Command("sh", "-c", r.Unless)
+		err := core.CommandRunner.Run(cmd)
 		if err == nil {
 			return false, nil // Unless başarılı, işlem yapma
 		}
@@ -52,7 +59,8 @@ func (r *ExecAdapter) Check(ctx *core.SystemContext) (bool, error) {
 
 	// 2. OnlyIf Kontrolü: Eğer başarısız olursa, çalışmaya GEREK YOK (return false)
 	if r.OnlyIf != "" {
-		err := exec.Command("sh", "-c", r.OnlyIf).Run()
+		cmd := exec.Command("sh", "-c", r.OnlyIf)
+		err := core.CommandRunner.Run(cmd)
 		if err != nil {
 			return false, nil // OnlyIf başarısız, işlem yapma
 		}
@@ -72,9 +80,9 @@ func (r *ExecAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 		return core.SuccessChange(fmt.Sprintf("[DryRun] Exec: %s", r.Command)), nil
 	}
 
-	out, err := exec.Command("sh", "-c", r.Command).CombinedOutput()
+	out, err := core.RunCommand("sh", "-c", r.Command)
 	if err != nil {
-		return core.Failure(err, fmt.Sprintf("Command failed: %s", string(out))), err
+		return core.Failure(err, fmt.Sprintf("Command failed: %s", out)), err
 	}
 
 	return core.SuccessChange("Command executed successfully"), nil
@@ -82,7 +90,7 @@ func (r *ExecAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 
 func (r *ExecAdapter) Revert(ctx *core.SystemContext) error {
 	if r.RevertCommand != "" {
-		out, err := exec.Command("sh", "-c", r.RevertCommand).CombinedOutput()
+		out, err := core.RunCommand("sh", "-c", r.RevertCommand)
 		if err != nil {
 			return fmt.Errorf("revert command failed: %s: %w", out, err)
 		}

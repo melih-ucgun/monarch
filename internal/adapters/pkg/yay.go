@@ -11,7 +11,14 @@ type YayAdapter struct {
 	State string
 }
 
-func NewYayAdapter(name string, state string) *YayAdapter {
+func init() {
+	core.RegisterResource("yay", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewYayAdapter(name, params), nil
+	})
+}
+
+func NewYayAdapter(name string, params map[string]interface{}) core.Resource {
+	state, _ := params["state"].(string)
 	if state == "" {
 		state = "present"
 	}

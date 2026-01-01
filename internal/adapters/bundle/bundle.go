@@ -9,7 +9,14 @@ type Adapter struct {
 	Name string
 }
 
-func New(name string) *Adapter {
+func init() {
+	core.RegisterResource("bundle", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewBundleAdapter(name, params, ctx), nil
+	})
+}
+
+// NewBundleAdapter creates a new bundle adapter.
+func NewBundleAdapter(name string, params map[string]interface{}, ctx *core.SystemContext) core.Resource {
 	return &Adapter{
 		Name: name,
 	}

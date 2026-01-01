@@ -12,7 +12,14 @@ type AptAdapter struct {
 	ActionPerformed string
 }
 
-func NewAptAdapter(name string, state string) *AptAdapter {
+func init() {
+	core.RegisterResource("apt", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewAptAdapter(name, params), nil
+	})
+}
+
+func NewAptAdapter(name string, params map[string]interface{}) core.Resource {
+	state, _ := params["state"].(string)
 	if state == "" {
 		state = "present"
 	}

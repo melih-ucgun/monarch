@@ -15,7 +15,13 @@ type ServiceAdapter struct {
 	ActionPerformed []string // To track actions for Revert (e.g., "started", "enabled")
 }
 
-func NewServiceAdapter(name string, params map[string]interface{}, ctx *core.SystemContext) *ServiceAdapter {
+func init() {
+	core.RegisterResource("service", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewServiceAdapter(name, params, ctx), nil
+	})
+}
+
+func NewServiceAdapter(name string, params map[string]interface{}, ctx *core.SystemContext) core.Resource {
 	state, _ := params["state"].(string)
 	if state == "" {
 		state = "active"

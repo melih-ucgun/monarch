@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/melih-ucgun/veto/internal/core"
 )
 
 type SysVinitManager struct {
@@ -12,9 +14,9 @@ type SysVinitManager struct {
 
 func NewSysVinitManager() *SysVinitManager {
 	mgr := &SysVinitManager{}
-	if _, err := exec.LookPath("update-rc.d"); err == nil {
+	if core.IsCommandAvailable("update-rc.d") {
 		mgr.enableCmd = "update-rc.d"
-	} else if _, err := exec.LookPath("chkconfig"); err == nil {
+	} else if core.IsCommandAvailable("chkconfig") {
 		mgr.enableCmd = "chkconfig"
 	}
 	return mgr
@@ -27,19 +29,19 @@ func (s *SysVinitManager) Name() string {
 func (s *SysVinitManager) IsEnabled(service string) (bool, error) {
 	if s.enableCmd == "chkconfig" {
 		cmd := exec.Command("chkconfig", "--list", service)
-		out, _ := cmd.CombinedOutput()
+		out, _ := core.CommandRunner.CombinedOutput(cmd)
 		return strings.Contains(string(out), ":on"), nil
 	}
 	// update-rc.d doesn't easily show status, assuming false or skipping
 	// ls /etc/rc3.d/S*service
 	cmd := exec.Command("bash", "-c", fmt.Sprintf("ls /etc/rc*.d/S*%s 2>/dev/null", service))
-	err := cmd.Run()
+	err := core.CommandRunner.Run(cmd)
 	return err == nil, nil
 }
 
 func (s *SysVinitManager) IsActive(service string) (bool, error) {
 	cmd := exec.Command("service", service, "status")
-	err := cmd.Run()
+	err := core.CommandRunner.Run(cmd)
 	return err == nil, nil
 }
 
@@ -79,7 +81,7 @@ func (s *SysVinitManager) Reload(service string) error {
 
 func (s *SysVinitManager) runService(service string, action string) error {
 	cmd := exec.Command("service", service, action)
-	if out, err := cmd.CombinedOutput(); err != nil {
+	if out, err := core.CommandRunner.CombinedOutput(cmd); err != nil {
 		return fmt.Errorf("service %s %s failed: %s: %w", service, action, string(out), err)
 	}
 	return nil
@@ -87,7 +89,7 @@ func (s *SysVinitManager) runService(service string, action string) error {
 
 func (s *SysVinitManager) run(cmdName string, args ...string) error {
 	cmd := exec.Command(cmdName, args...)
-	if out, err := cmd.CombinedOutput(); err != nil {
+	if out, err := core.CommandRunner.CombinedOutput(cmd); err != nil {
 		return fmt.Errorf("%s %s failed: %s: %w", cmdName, strings.Join(args, " "), string(out), err)
 	}
 	return nil

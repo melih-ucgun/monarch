@@ -11,7 +11,14 @@ type SnapAdapter struct {
 	State string
 }
 
-func NewSnapAdapter(name string, state string) *SnapAdapter {
+func init() {
+	core.RegisterResource("snap", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewSnapAdapter(name, params), nil
+	})
+}
+
+func NewSnapAdapter(name string, params map[string]interface{}) core.Resource {
+	state, _ := params["state"].(string)
 	if state == "" {
 		state = "present"
 	}

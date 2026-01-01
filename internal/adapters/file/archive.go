@@ -13,6 +13,15 @@ import (
 	"github.com/melih-ucgun/veto/internal/core"
 )
 
+func init() {
+	core.RegisterResource("archive", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewArchiveAdapter(name, params), nil
+	})
+	core.RegisterResource("extract", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewArchiveAdapter(name, params), nil
+	})
+}
+
 type ArchiveAdapter struct {
 	core.BaseResource
 	Source string // Arşiv dosyasının yolu (örn: /tmp/app.zip)
@@ -20,7 +29,7 @@ type ArchiveAdapter struct {
 	Mode   os.FileMode
 }
 
-func NewArchiveAdapter(name string, params map[string]interface{}) *ArchiveAdapter {
+func NewArchiveAdapter(name string, params map[string]interface{}) core.Resource {
 	src, _ := params["source"].(string)
 	if src == "" {
 		src = name

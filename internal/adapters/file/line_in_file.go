@@ -9,6 +9,15 @@ import (
 	"github.com/melih-ucgun/veto/internal/core"
 )
 
+func init() {
+	core.RegisterResource("line_in_file", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewLineInFileAdapter(name, params), nil
+	})
+	core.RegisterResource("lineinfile", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewLineInFileAdapter(name, params), nil
+	})
+}
+
 type LineInFileAdapter struct {
 	core.BaseResource
 	Path   string
@@ -17,7 +26,7 @@ type LineInFileAdapter struct {
 	State  string // present, absent
 }
 
-func NewLineInFileAdapter(name string, params map[string]interface{}) *LineInFileAdapter {
+func NewLineInFileAdapter(name string, params map[string]interface{}) core.Resource {
 	path, _ := params["path"].(string)
 	if path == "" {
 		path = name

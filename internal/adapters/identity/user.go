@@ -8,6 +8,12 @@ import (
 	"github.com/melih-ucgun/veto/internal/core"
 )
 
+func init() {
+	core.RegisterResource("user", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewUserAdapter(name, params), nil
+	})
+}
+
 type UserAdapter struct {
 	core.BaseResource
 	Uid             string
@@ -20,7 +26,7 @@ type UserAdapter struct {
 	ActionPerformed string
 }
 
-func NewUserAdapter(name string, params map[string]interface{}) *UserAdapter {
+func NewUserAdapter(name string, params map[string]interface{}) core.Resource {
 	uid, _ := params["uid"].(string)
 	gid, _ := params["gid"].(string)
 	home, _ := params["home"].(string)
@@ -70,7 +76,7 @@ func (r *UserAdapter) Validate() error {
 func (r *UserAdapter) Check(ctx *core.SystemContext) (bool, error) {
 	// id -u <user>
 	cmd := exec.Command("id", "-u", r.Name)
-	err := cmd.Run()
+	err := core.CommandRunner.Run(cmd)
 	exists := (err == nil)
 
 	if r.State == "absent" {
@@ -97,7 +103,8 @@ func (r *UserAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 	}
 
 	if r.State == "absent" {
-		if out, err := exec.Command("userdel", "-r", r.Name).CombinedOutput(); err != nil {
+		cmd := exec.Command("userdel", "-r", r.Name)
+		if out, err := core.CommandRunner.CombinedOutput(cmd); err != nil {
 			return core.Failure(err, "Failed to delete user: "+string(out)), err
 		}
 		r.ActionPerformed = "deleted"
@@ -127,7 +134,8 @@ func (r *UserAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 
 	args = append(args, r.Name)
 
-	if out, err := exec.Command("useradd", args...).CombinedOutput(); err != nil {
+	cmd := exec.Command("useradd", args...)
+	if out, err := core.CommandRunner.CombinedOutput(cmd); err != nil {
 		return core.Failure(err, "Failed to create user: "+string(out)), err
 	}
 	r.ActionPerformed = "created"
@@ -138,7 +146,8 @@ func (r *UserAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 func (r *UserAdapter) Revert(ctx *core.SystemContext) error {
 	if r.ActionPerformed == "created" {
 		// Oluşturulan kullanıcıyı sil
-		if out, err := exec.Command("userdel", "-r", r.Name).CombinedOutput(); err != nil {
+		cmd := exec.Command("userdel", "-r", r.Name)
+		if out, err := core.CommandRunner.CombinedOutput(cmd); err != nil {
 			return fmt.Errorf("failed to revert user creation: %s: %w", out, err)
 		}
 	}

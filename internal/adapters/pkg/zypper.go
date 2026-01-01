@@ -11,7 +11,14 @@ type ZypperAdapter struct {
 	State string
 }
 
-func NewZypperAdapter(name string, state string) *ZypperAdapter {
+func init() {
+	core.RegisterResource("zypper", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewZypperAdapter(name, params), nil
+	})
+}
+
+func NewZypperAdapter(name string, params map[string]interface{}) core.Resource {
+	state, _ := params["state"].(string)
 	if state == "" {
 		state = "present"
 	}

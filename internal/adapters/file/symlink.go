@@ -8,6 +8,12 @@ import (
 	"github.com/melih-ucgun/veto/internal/core"
 )
 
+func init() {
+	core.RegisterResource("symlink", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewSymlinkAdapter(name, params), nil
+	})
+}
+
 type SymlinkAdapter struct {
 	core.BaseResource
 	Link   string // Linkin oluşacağı yer
@@ -16,7 +22,7 @@ type SymlinkAdapter struct {
 	Force  bool
 }
 
-func NewSymlinkAdapter(name string, params map[string]interface{}) *SymlinkAdapter {
+func NewSymlinkAdapter(name string, params map[string]interface{}) core.Resource {
 	link, _ := params["path"].(string)
 	if link == "" {
 		link = name

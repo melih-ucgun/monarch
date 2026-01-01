@@ -11,7 +11,14 @@ type BrewAdapter struct {
 	State string
 }
 
-func NewBrewAdapter(name string, state string) *BrewAdapter {
+func init() {
+	core.RegisterResource("brew", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewBrewAdapter(name, params), nil
+	})
+}
+
+func NewBrewAdapter(name string, params map[string]interface{}) core.Resource {
+	state, _ := params["state"].(string)
 	if state == "" {
 		state = "present"
 	}

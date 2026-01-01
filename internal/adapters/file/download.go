@@ -10,6 +10,12 @@ import (
 	"github.com/melih-ucgun/veto/internal/core"
 )
 
+func init() {
+	core.RegisterResource("download", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewDownloadAdapter(name, params), nil
+	})
+}
+
 type DownloadAdapter struct {
 	core.BaseResource
 	URL        string
@@ -18,7 +24,7 @@ type DownloadAdapter struct {
 	BackupPath string
 }
 
-func NewDownloadAdapter(name string, params map[string]interface{}) *DownloadAdapter {
+func NewDownloadAdapter(name string, params map[string]interface{}) core.Resource {
 	url, _ := params["url"].(string)
 	dest, _ := params["dest"].(string)
 	if dest == "" {

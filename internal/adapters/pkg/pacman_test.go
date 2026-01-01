@@ -10,10 +10,11 @@ import (
 	"github.com/melih-ucgun/veto/internal/core"
 )
 
-// MockRunner is a mock implementation of Runner interface.
+// MockRunner is a mock implementation of core.Runner interface.
 type MockRunner struct {
 	RunFunc            func(cmd *exec.Cmd) error
 	CombinedOutputFunc func(cmd *exec.Cmd) ([]byte, error)
+	OutputFunc         func(cmd *exec.Cmd) ([]byte, error)
 }
 
 func (m *MockRunner) Run(cmd *exec.Cmd) error {
@@ -30,9 +31,16 @@ func (m *MockRunner) CombinedOutput(cmd *exec.Cmd) ([]byte, error) {
 	return []byte{}, nil
 }
 
+func (m *MockRunner) Output(cmd *exec.Cmd) ([]byte, error) {
+	if m.OutputFunc != nil {
+		return m.OutputFunc(cmd)
+	}
+	return []byte{}, nil
+}
+
 func TestPacmanAdapter_Check(t *testing.T) {
 	// Restore original runner after tests
-	defer func() { CommandRunner = &RealRunner{} }()
+	defer func() { core.CommandRunner = &core.RealRunner{} }()
 
 	tests := []struct {
 		name          string
@@ -74,7 +82,7 @@ func TestPacmanAdapter_Check(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup Mock
-			CommandRunner = &MockRunner{
+			core.CommandRunner = &MockRunner{
 				RunFunc: func(cmd *exec.Cmd) error {
 					// Verify command is checking package existence
 					if len(cmd.Args) < 1 || cmd.Args[0] != "pacman" {
@@ -88,7 +96,7 @@ func TestPacmanAdapter_Check(t *testing.T) {
 				},
 			}
 
-			adapter := NewPacmanAdapter(tt.packageName, tt.state)
+			adapter := NewPacmanAdapter(tt.packageName, map[string]interface{}{"state": tt.state}).(*PacmanAdapter)
 			needsAction, err := adapter.Check(&core.SystemContext{})
 
 			if err != nil {
@@ -102,13 +110,13 @@ func TestPacmanAdapter_Check(t *testing.T) {
 }
 
 func TestPacmanAdapter_Apply(t *testing.T) {
-	defer func() { CommandRunner = &RealRunner{} }()
+	defer func() { core.CommandRunner = &core.RealRunner{} }()
 
 	t.Run("DryRun should not execute install command", func(t *testing.T) {
-		adapter := NewPacmanAdapter("htop", "present")
+		adapter := NewPacmanAdapter("htop", map[string]interface{}{"state": "present"}).(*PacmanAdapter)
 
 		// Mock check to say package is missing (so it tries to install)
-		CommandRunner = &MockRunner{
+		core.CommandRunner = &MockRunner{
 			RunFunc: func(cmd *exec.Cmd) error {
 				return errors.New("not installed")
 			},
@@ -129,11 +137,11 @@ func TestPacmanAdapter_Apply(t *testing.T) {
 	})
 
 	t.Run("Install success", func(t *testing.T) {
-		adapter := NewPacmanAdapter("htop", "present")
+		adapter := NewPacmanAdapter("htop", map[string]interface{}{"state": "present"}).(*PacmanAdapter)
 
 		var executedCmd []string
 
-		CommandRunner = &MockRunner{
+		core.CommandRunner = &MockRunner{
 			RunFunc: func(cmd *exec.Cmd) error {
 				// 1. Check call (returns err -> not installed)
 				if cmd.Args[1] == "-Qi" {
@@ -170,15 +178,15 @@ func TestPacmanAdapter_Apply(t *testing.T) {
 }
 
 func TestPacmanAdapter_Revert(t *testing.T) {
-	defer func() { CommandRunner = &RealRunner{} }()
+	defer func() { core.CommandRunner = &core.RealRunner{} }()
 
 	t.Run("Revert installed package", func(t *testing.T) {
-		adapter := NewPacmanAdapter("nano", "present")
+		adapter := NewPacmanAdapter("nano", map[string]interface{}{"state": "present"}).(*PacmanAdapter)
 		adapter.ActionPerformed = "installed"
 
 		var executedCmd []string
 
-		CommandRunner = &MockRunner{
+		core.CommandRunner = &MockRunner{
 			CombinedOutputFunc: func(cmd *exec.Cmd) ([]byte, error) {
 				executedCmd = cmd.Args
 				return []byte("removed"), nil

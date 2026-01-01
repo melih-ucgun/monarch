@@ -11,7 +11,14 @@ type YumAdapter struct {
 	State string
 }
 
-func NewYumAdapter(name string, state string) *YumAdapter {
+func init() {
+	core.RegisterResource("yum", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewYumAdapter(name, params), nil
+	})
+}
+
+func NewYumAdapter(name string, params map[string]interface{}) core.Resource {
+	state, _ := params["state"].(string)
 	if state == "" {
 		state = "present"
 	}

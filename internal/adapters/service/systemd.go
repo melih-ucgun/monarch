@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/melih-ucgun/veto/internal/core"
 )
 
 type SystemdManager struct{}
@@ -18,14 +20,14 @@ func (s *SystemdManager) Name() string {
 
 func (s *SystemdManager) IsEnabled(service string) (bool, error) {
 	cmd := exec.Command("systemctl", "is-enabled", service)
-	out, _ := cmd.CombinedOutput() // Error is expected if disabled
+	out, _ := core.CommandRunner.CombinedOutput(cmd) // Error is expected if disabled
 	status := strings.TrimSpace(string(out))
 	return status == "enabled", nil
 }
 
 func (s *SystemdManager) IsActive(service string) (bool, error) {
 	cmd := exec.Command("systemctl", "is-active", service)
-	out, _ := cmd.CombinedOutput() // Error is expected if inactive
+	out, _ := core.CommandRunner.CombinedOutput(cmd) // Error is expected if inactive
 	status := strings.TrimSpace(string(out))
 	return status == "active", nil
 }
@@ -56,7 +58,7 @@ func (s *SystemdManager) Reload(service string) error {
 
 func (s *SystemdManager) run(args ...string) error {
 	cmd := exec.Command("systemctl", args...)
-	if out, err := cmd.CombinedOutput(); err != nil {
+	if out, err := core.CommandRunner.CombinedOutput(cmd); err != nil {
 		return fmt.Errorf("systemctl %s failed: %s: %w", strings.Join(args, " "), string(out), err)
 	}
 	return nil
@@ -65,7 +67,7 @@ func (s *SystemdManager) run(args ...string) error {
 func (s *SystemdManager) ListEnabled() ([]string, error) {
 	// systemctl list-unit-files --state=enabled --type=service --no-legend --no-pager
 	cmd := exec.Command("systemctl", "list-unit-files", "--state=enabled", "--type=service", "--no-legend", "--no-pager")
-	out, err := cmd.Output()
+	out, err := core.CommandRunner.Output(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list enabled services: %w", err)
 	}

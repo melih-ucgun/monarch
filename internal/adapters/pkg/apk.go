@@ -11,7 +11,14 @@ type ApkAdapter struct {
 	State string
 }
 
-func NewApkAdapter(name string, state string) *ApkAdapter {
+func init() {
+	core.RegisterResource("apk", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewApkAdapter(name, params), nil
+	})
+}
+
+func NewApkAdapter(name string, params map[string]interface{}) core.Resource {
+	state, _ := params["state"].(string)
 	if state == "" {
 		state = "present"
 	}

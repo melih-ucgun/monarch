@@ -10,6 +10,12 @@ import (
 	"github.com/melih-ucgun/veto/internal/core"
 )
 
+func init() {
+	core.RegisterResource("template", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewTemplateAdapter(name, params), nil
+	})
+}
+
 type TemplateAdapter struct {
 	core.BaseResource
 	Src        string                 // Template dosyasının yolu
@@ -19,7 +25,7 @@ type TemplateAdapter struct {
 	BackupPath string
 }
 
-func NewTemplateAdapter(name string, params map[string]interface{}) *TemplateAdapter {
+func NewTemplateAdapter(name string, params map[string]interface{}) core.Resource {
 	src, _ := params["src"].(string)
 	dest, _ := params["dest"].(string)
 	if dest == "" {

@@ -12,6 +12,12 @@ import (
 	"github.com/melih-ucgun/veto/internal/core"
 )
 
+func init() {
+	core.RegisterResource("git", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewGitAdapter(name, params), nil
+	})
+}
+
 type GitAdapter struct {
 	core.BaseResource
 	Repo        string
@@ -26,7 +32,7 @@ type GitAdapter struct {
 	IsNew       bool   // Yeni klonlandı mı?
 }
 
-func NewGitAdapter(name string, params map[string]interface{}) *GitAdapter {
+func NewGitAdapter(name string, params map[string]interface{}) core.Resource {
 	repo, _ := params["repo"].(string)
 	dest, _ := params["dest"].(string)
 	branch, _ := params["branch"].(string)
@@ -187,7 +193,8 @@ func (r *GitAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 			args = append(args, "-b", r.Branch)
 		}
 
-		out, err := exec.Command("git", args...).CombinedOutput()
+		cmd := exec.Command("git", args...)
+		out, err := core.CommandRunner.CombinedOutput(cmd)
 		if err != nil {
 			return core.Failure(err, fmt.Sprintf("Git clone failed: %s", string(out))), err
 		}
@@ -233,7 +240,8 @@ func (r *GitAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 	// Eğer branch ise ve update isteniyorsa pull yap
 	if r.Update && r.Commit == "" && r.Tag == "" {
 		// git pull origin branch
-		out, err := exec.Command("git", "-C", r.Dest, "pull", r.Remote, r.Branch).CombinedOutput()
+		cmd := exec.Command("git", "-C", r.Dest, "pull", r.Remote, r.Branch)
+		out, err := core.CommandRunner.CombinedOutput(cmd)
 		if err != nil {
 			return core.Failure(err, fmt.Sprintf("Git pull failed: %s", string(out))), err
 		}
@@ -268,7 +276,8 @@ func isGitRepo(path string) bool {
 }
 
 func getRemoteURL(path, remote string) (string, error) {
-	out, err := exec.Command("git", "-C", path, "remote", "get-url", remote).CombinedOutput()
+	cmd := exec.Command("git", "-C", path, "remote", "get-url", remote)
+	out, err := core.CommandRunner.CombinedOutput(cmd)
 	if err != nil {
 		return "", err
 	}
@@ -276,7 +285,8 @@ func getRemoteURL(path, remote string) (string, error) {
 }
 
 func getHeadSHA(path string) (string, error) {
-	out, err := exec.Command("git", "-C", path, "rev-parse", "HEAD").CombinedOutput()
+	cmd := exec.Command("git", "-C", path, "rev-parse", "HEAD")
+	out, err := core.CommandRunner.CombinedOutput(cmd)
 	if err != nil {
 		return "", err
 	}
@@ -284,7 +294,8 @@ func getHeadSHA(path string) (string, error) {
 }
 
 func fetchRemote(path, remote string) error {
-	out, err := exec.Command("git", "-C", path, "fetch", remote).CombinedOutput()
+	cmd := exec.Command("git", "-C", path, "fetch", remote)
+	out, err := core.CommandRunner.CombinedOutput(cmd)
 	if err != nil {
 		return fmt.Errorf("output: %s, error: %w", string(out), err)
 	}
@@ -292,7 +303,8 @@ func fetchRemote(path, remote string) error {
 }
 
 func getCurrentBranch(path string) (string, error) {
-	out, err := exec.Command("git", "-C", path, "rev-parse", "--abbrev-ref", "HEAD").CombinedOutput()
+	cmd := exec.Command("git", "-C", path, "rev-parse", "--abbrev-ref", "HEAD")
+	out, err := core.CommandRunner.CombinedOutput(cmd)
 	if err != nil {
 		return "", err
 	}
@@ -300,7 +312,8 @@ func getCurrentBranch(path string) (string, error) {
 }
 
 func getRefSHA(path, ref string) (string, error) {
-	out, err := exec.Command("git", "-C", path, "rev-parse", ref).CombinedOutput()
+	cmd := exec.Command("git", "-C", path, "rev-parse", ref)
+	out, err := core.CommandRunner.CombinedOutput(cmd)
 	if err != nil {
 		return "", err
 	}
@@ -308,7 +321,8 @@ func getRefSHA(path, ref string) (string, error) {
 }
 
 func checkout(path, target string) error {
-	out, err := exec.Command("git", "-C", path, "checkout", target).CombinedOutput()
+	cmd := exec.Command("git", "-C", path, "checkout", target)
+	out, err := core.CommandRunner.CombinedOutput(cmd)
 	if err != nil {
 		return fmt.Errorf("output: %s, error: %w", string(out), err)
 	}

@@ -12,7 +12,14 @@ type ParuAdapter struct {
 	ActionPerformed string
 }
 
-func NewParuAdapter(name string, state string) *ParuAdapter {
+func init() {
+	core.RegisterResource("paru", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewParuAdapter(name, params), nil
+	})
+}
+
+func NewParuAdapter(name string, params map[string]interface{}) core.Resource {
+	state, _ := params["state"].(string)
 	if state == "" {
 		state = "present"
 	}

@@ -9,6 +9,12 @@ import (
 	"github.com/melih-ucgun/veto/internal/core"
 )
 
+func init() {
+	core.RegisterResource("group", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewGroupAdapter(name, params), nil
+	})
+}
+
 type GroupAdapter struct {
 	core.BaseResource
 	Gid             int
@@ -17,7 +23,7 @@ type GroupAdapter struct {
 	ActionPerformed string
 }
 
-func NewGroupAdapter(name string, params map[string]interface{}) *GroupAdapter {
+func NewGroupAdapter(name string, params map[string]interface{}) core.Resource {
 	gid := -1
 	if g, ok := params["gid"].(int); ok {
 		gid = g
@@ -53,7 +59,7 @@ func (r *GroupAdapter) Validate() error {
 func (r *GroupAdapter) Check(ctx *core.SystemContext) (bool, error) {
 	// getent group <name>
 	cmd := exec.Command("getent", "group", r.Name)
-	err := cmd.Run()
+	err := core.CommandRunner.Run(cmd)
 	exists := (err == nil)
 
 	if r.State == "absent" {
@@ -67,7 +73,8 @@ func (r *GroupAdapter) Check(ctx *core.SystemContext) (bool, error) {
 	// Grup var, GID kontrolü (opsiyonel)
 	if r.Gid != -1 {
 		// getent çıktısını parse et: root:x:0:
-		out, _ := cmd.CombinedOutput()
+		cmdOut := exec.Command("getent", "group", r.Name)
+		out, _ := core.CommandRunner.CombinedOutput(cmdOut)
 		parts := strings.Split(strings.TrimSpace(string(out)), ":")
 		if len(parts) >= 3 {
 			currentGid, _ := strconv.Atoi(parts[2])
@@ -91,7 +98,8 @@ func (r *GroupAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 	}
 
 	if r.State == "absent" {
-		if out, err := exec.Command("groupdel", r.Name).CombinedOutput(); err != nil {
+		cmd := exec.Command("groupdel", r.Name)
+		if out, err := core.CommandRunner.CombinedOutput(cmd); err != nil {
 			return core.Failure(err, "Failed to delete group: "+string(out)), err
 		}
 		r.ActionPerformed = "deleted"
@@ -103,7 +111,7 @@ func (r *GroupAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 	// Eğer grup zaten varsa ama GID yanlışsa, groupmod çalıştırılmalı.
 
 	cmdCheck := exec.Command("getent", "group", r.Name)
-	if err := cmdCheck.Run(); err == nil {
+	if err := core.CommandRunner.Run(cmdCheck); err == nil {
 		// Grup var, güncelle (groupmod)
 		args := []string{}
 		if r.Gid != -1 {
@@ -112,7 +120,8 @@ func (r *GroupAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 		args = append(args, r.Name)
 
 		if len(args) > 1 { // Sadece isim değil, argüman da varsa
-			if out, err := exec.Command("groupmod", args...).CombinedOutput(); err != nil {
+			cmdMod := exec.Command("groupmod", args...)
+			if out, err := core.CommandRunner.CombinedOutput(cmdMod); err != nil {
 				return core.Failure(err, "Failed to modify group: "+string(out)), err
 			}
 			r.ActionPerformed = "modified"
@@ -131,7 +140,8 @@ func (r *GroupAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 	}
 	args = append(args, r.Name)
 
-	if out, err := exec.Command("groupadd", args...).CombinedOutput(); err != nil {
+	cmdAdd := exec.Command("groupadd", args...)
+	if out, err := core.CommandRunner.CombinedOutput(cmdAdd); err != nil {
 		return core.Failure(err, "Failed to create group: "+string(out)), err
 	}
 	r.ActionPerformed = "created"
@@ -141,7 +151,8 @@ func (r *GroupAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 
 func (r *GroupAdapter) Revert(ctx *core.SystemContext) error {
 	if r.ActionPerformed == "created" {
-		if out, err := exec.Command("groupdel", r.Name).CombinedOutput(); err != nil {
+		cmd := exec.Command("groupdel", r.Name)
+		if out, err := core.CommandRunner.CombinedOutput(cmd); err != nil {
 			return fmt.Errorf("failed to revert group creation: %s: %w", out, err)
 		}
 	}

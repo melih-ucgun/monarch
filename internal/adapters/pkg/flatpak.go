@@ -12,7 +12,14 @@ type FlatpakAdapter struct {
 	ActionPerformed string
 }
 
-func NewFlatpakAdapter(name string, state string) *FlatpakAdapter {
+func init() {
+	core.RegisterResource("flatpak", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewFlatpakAdapter(name, params), nil
+	})
+}
+
+func NewFlatpakAdapter(name string, params map[string]interface{}) core.Resource {
+	state, _ := params["state"].(string)
 	if state == "" {
 		state = "present"
 	}

@@ -9,6 +9,12 @@ import (
 	"github.com/melih-ucgun/veto/internal/core"
 )
 
+func init() {
+	core.RegisterResource("file", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewFileAdapter(name, params), nil
+	})
+}
+
 type FileAdapter struct {
 	core.BaseResource
 	Path       string
@@ -24,7 +30,7 @@ func (r *FileAdapter) GetBackupPath() string {
 	return r.BackupPath
 }
 
-func NewFileAdapter(name string, params map[string]interface{}) *FileAdapter {
+func NewFileAdapter(name string, params map[string]interface{}) core.Resource {
 	path, _ := params["path"].(string)
 	if path == "" {
 		path = name // Eğer path verilmezse name'i path olarak kullan

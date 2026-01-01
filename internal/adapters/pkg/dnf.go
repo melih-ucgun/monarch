@@ -12,7 +12,14 @@ type DnfAdapter struct {
 	ActionPerformed string
 }
 
-func NewDnfAdapter(name string, state string) *DnfAdapter {
+func init() {
+	core.RegisterResource("dnf", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewDnfAdapter(name, params), nil
+	})
+}
+
+func NewDnfAdapter(name string, params map[string]interface{}) core.Resource {
+	state, _ := params["state"].(string)
 	if state == "" {
 		state = "present"
 	}

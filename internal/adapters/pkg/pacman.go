@@ -14,8 +14,15 @@ type PacmanAdapter struct {
 	ActionPerformed   string // "installed", "removed", ""
 }
 
+func init() {
+	core.RegisterResource("pacman", func(name string, params map[string]interface{}, ctx *core.SystemContext) (core.Resource, error) {
+		return NewPacmanAdapter(name, params), nil
+	})
+}
+
 // NewPacmanAdapter yeni bir örnek oluşturur.
-func NewPacmanAdapter(name string, state string) *PacmanAdapter {
+func NewPacmanAdapter(name string, params map[string]interface{}) core.Resource {
+	state, _ := params["state"].(string)
 	if state == "" {
 		state = "present"
 	}
