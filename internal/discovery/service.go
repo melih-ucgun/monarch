@@ -2,35 +2,34 @@ package discovery
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
-	"os/exec"
 	"strings"
+
+	"github.com/melih-ucgun/veto/internal/core"
 )
 
-func discoverServices(initSystem string) ([]string, error) {
-	switch initSystem {
+func discoverServices(ctx *core.SystemContext) ([]string, error) {
+	switch ctx.InitSystem {
 	case "systemd":
-		return discoverSystemd()
+		return discoverSystemd(ctx)
 	case "openrc":
-		return discoverOpenRC()
+		return discoverOpenRC(ctx)
 	case "sysvinit":
-		return discoverSysVinit()
+		return discoverSysVinit(ctx)
 	default:
-		return nil, fmt.Errorf("unsupported init system: %s", initSystem)
+		return nil, fmt.Errorf("unsupported init system: %s", ctx.InitSystem)
 	}
 }
 
-func discoverSystemd() ([]string, error) {
+func discoverSystemd(ctx *core.SystemContext) ([]string, error) {
 	// systemctl list-unit-files --state=enabled --type=service --no-legend
-	cmd := exec.Command("systemctl", "list-unit-files", "--state=enabled", "--type=service", "--no-legend")
-	output, err := cmd.Output()
+	output, err := ctx.Transport.Execute(ctx.Context, "systemctl list-unit-files --state=enabled --type=service --no-legend")
 	if err != nil {
 		return nil, err
 	}
 
 	var services []string
-	scanner := bufio.NewScanner(bytes.NewReader(output))
+	scanner := bufio.NewScanner(strings.NewReader(output))
 	for scanner.Scan() {
 		line := scanner.Text()
 		fields := strings.Fields(line)
@@ -44,16 +43,15 @@ func discoverSystemd() ([]string, error) {
 	return services, nil
 }
 
-func discoverOpenRC() ([]string, error) {
+func discoverOpenRC(ctx *core.SystemContext) ([]string, error) {
 	// rc-update show default
-	cmd := exec.Command("rc-update", "show", "default")
-	output, err := cmd.Output()
+	output, err := ctx.Transport.Execute(ctx.Context, "rc-update show default")
 	if err != nil {
 		return nil, err
 	}
 
 	var services []string
-	scanner := bufio.NewScanner(bytes.NewReader(output))
+	scanner := bufio.NewScanner(strings.NewReader(output))
 	for scanner.Scan() {
 		line := scanner.Text()
 		fields := strings.Fields(line)
@@ -64,7 +62,7 @@ func discoverOpenRC() ([]string, error) {
 	return services, nil
 }
 
-func discoverSysVinit() ([]string, error) {
+func discoverSysVinit(ctx *core.SystemContext) ([]string, error) {
 	// This is messy across distros.
 	// Debian/Ubuntu: service --status-all | grep +
 	// But sysvinit is rare now. Returning empty for now.

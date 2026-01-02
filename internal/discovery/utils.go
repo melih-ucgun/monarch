@@ -3,12 +3,13 @@ package discovery
 import (
 	"bufio"
 	"bytes"
-	"os/exec"
 	"strings"
+
+	"github.com/melih-ucgun/veto/internal/core"
 )
 
-func isCommandAvailable(name string) bool {
-	_, err := exec.LookPath(name)
+func isCommandAvailable(ctx *core.SystemContext, name string) bool {
+	_, err := ctx.Transport.Execute(ctx.Context, "which "+name)
 	return err == nil
 }
 

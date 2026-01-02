@@ -75,7 +75,8 @@ func runApply(configFile string, isDryRun bool, skipSnapshot bool, isPrune bool)
 	}
 
 	// 1. Detect System
-	ctx := system.Detect(isDryRun)
+	ctx := core.NewSystemContext(isDryRun)
+	system.Detect(ctx)
 
 	// 1.5 Load System Profile (if exists)
 	if data, err := os.ReadFile(".veto/system.yaml"); err == nil {

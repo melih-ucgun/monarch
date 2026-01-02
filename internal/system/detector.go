@@ -3,29 +3,25 @@ package system
 import (
 	"bufio"
 	"fmt"
-	"os"
-	"os/exec"
-	"os/user"
-	"runtime"
 	"strconv"
 	"strings"
 
 	"github.com/melih-ucgun/veto/internal/core"
 )
 
-// Detect, mevcut sistemi analiz eder ve bir SystemContext doldurur.
-func Detect(dryRun bool) *core.SystemContext {
-	ctx := core.NewSystemContext(dryRun)
-
+// Detect, mevcut sistemi analiz eder ve SystemContext'i doldurur.
+func Detect(ctx *core.SystemContext) {
 	// 1. Temel OS Bilgileri
-	info := readOSRelease()
+	info := readOSRelease(ctx)
 	ctx.OS = "linux"
 	ctx.Distro = info["ID"]
 	ctx.Version = info["VERSION_ID"]
-	ctx.Version = info["VERSION_ID"]
-	ctx.Hostname, _ = os.Hostname()
-	ctx.InitSystem = detectInitSystem()
-	ctx.Kernel = detectKernel()
+
+	hostname, _ := ctx.Transport.Execute(ctx.Context, "hostname")
+	ctx.Hostname = strings.TrimSpace(hostname)
+
+	ctx.InitSystem = detectInitSystem(ctx)
+	ctx.Kernel = detectKernel(ctx)
 
 	// Arch tabanlı veya versiyon bilgisi olmayan sistemler için Rolling Release kontrolü
 	if ctx.Version == "" {
@@ -45,29 +41,32 @@ func Detect(dryRun bool) *core.SystemContext {
 	}
 
 	// 2. Kullanıcı Bilgileri
-	currentUser, err := user.Current()
-	if err == nil {
-		ctx.User = currentUser.Username
-		ctx.HomeDir = currentUser.HomeDir
-		ctx.UID = currentUser.Uid
-		ctx.GID = currentUser.Gid
+	if username, err := ctx.Transport.Execute(ctx.Context, "id -u -n"); err == nil {
+		ctx.User = strings.TrimSpace(username)
+	}
+	if home, err := ctx.Transport.Execute(ctx.Context, "echo $HOME"); err == nil {
+		ctx.HomeDir = strings.TrimSpace(home)
+	}
+	if uid, err := ctx.Transport.Execute(ctx.Context, "id -u"); err == nil {
+		ctx.UID = strings.TrimSpace(uid)
+	}
+	if gid, err := ctx.Transport.Execute(ctx.Context, "id -g"); err == nil {
+		ctx.GID = strings.TrimSpace(gid)
 	}
 
 	// 3. Donanım Tespiti
-	ctx.Hardware = detectHardware()
+	ctx.Hardware = detectHardware(ctx)
 
 	// 4. Çevresel Değişkenler
-	ctx.Env = detectEnv()
+	ctx.Env = detectEnv(ctx)
 
 	// 5. Dosya Sistemi
-	ctx.FSInfo = detectFS("/")
-
-	return ctx
+	ctx.FSInfo = detectFS(ctx, "/")
 }
 
-func readOSRelease() map[string]string {
+func readOSRelease(ctx *core.SystemContext) map[string]string {
 	info := make(map[string]string)
-	f, err := os.Open("/etc/os-release")
+	f, err := ctx.FS.Open("/etc/os-release")
 	if err != nil {
 		return info
 	}
@@ -85,14 +84,14 @@ func readOSRelease() map[string]string {
 	return info
 }
 
-func detectHardware() core.SystemHardware {
+func detectHardware(ctx *core.SystemContext) core.SystemHardware {
 	hw := core.SystemHardware{
 		CPUModel:  "Unknown CPU",
 		GPUVendor: "Unknown GPU",
 	}
 
 	// CPU
-	if f, err := os.Open("/proc/cpuinfo"); err == nil {
+	if f, err := ctx.FS.Open("/proc/cpuinfo"); err == nil {
 		defer f.Close()
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
@@ -102,17 +101,17 @@ func detectHardware() core.SystemHardware {
 				if len(parts) > 1 {
 					hw.CPUModel = strings.TrimSpace(parts[1])
 				}
-				// Tekirdek sayısını runtime.NumCPU() ile almak daha doğru olabilir ama
-				// /proc/cpuinfo'dan okuyorsak count yapabiliriz.
-				// Şimdilik sadece model adını ilk bulduğumuzda alalım.
 				break
 			}
 		}
 	}
-	hw.CPUCore = runtime.NumCPU()
+
+	if out, err := ctx.Transport.Execute(ctx.Context, "nproc"); err == nil {
+		hw.CPUCore, _ = strconv.Atoi(strings.TrimSpace(out))
+	}
 
 	// RAM
-	if f, err := os.Open("/proc/meminfo"); err == nil {
+	if f, err := ctx.FS.Open("/proc/meminfo"); err == nil {
 		defer f.Close()
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
@@ -120,7 +119,6 @@ func detectHardware() core.SystemHardware {
 			if strings.HasPrefix(line, "MemTotal:") {
 				parts := strings.Fields(line)
 				if len(parts) >= 2 {
-					// KB cinsinden gelir, GB'a çevirelim
 					if kb, err := strconv.Atoi(parts[1]); err == nil {
 						gb := float64(kb) / (1024 * 1024)
 						hw.RAMTotal = fmt.Sprintf("%.1f GB", gb)
@@ -134,8 +132,7 @@ func detectHardware() core.SystemHardware {
 	}
 
 	// GPU (lspci check)
-	// lspci -mm (machine readable) çıktısını kullanmak daha güvenli olabilir
-	if out, err := exec.Command("lspci").Output(); err == nil {
+	if out, err := ctx.Transport.Execute(ctx.Context, "lspci"); err == nil {
 		output := string(out)
 		lowerOut := strings.ToLower(output)
 		if strings.Contains(lowerOut, "nvidia") {
@@ -169,22 +166,26 @@ func extractGPUModel(lspciOut, vendor string) string {
 	return "Unknown Model"
 }
 
-func detectEnv() core.SystemEnv {
+func detectEnv(ctx *core.SystemContext) core.SystemEnv {
+	shell, _ := ctx.Transport.Execute(ctx.Context, "echo $SHELL")
+	lang, _ := ctx.Transport.Execute(ctx.Context, "echo $LANG")
+	term, _ := ctx.Transport.Execute(ctx.Context, "echo $TERM")
+
 	return core.SystemEnv{
-		Shell:    os.Getenv("SHELL"),
-		Lang:     os.Getenv("LANG"),
-		Term:     os.Getenv("TERM"),
-		Timezone: detectTimezone(),
+		Shell:    strings.TrimSpace(shell),
+		Lang:     strings.TrimSpace(lang),
+		Term:     strings.TrimSpace(term),
+		Timezone: detectTimezone(ctx),
 	}
 }
 
-func detectTimezone() string {
+func detectTimezone(ctx *core.SystemContext) string {
 	// /etc/timezone dosyasını oku veya sembolik linki kontrol et
-	if content, err := os.ReadFile("/etc/timezone"); err == nil {
+	if content, err := ctx.FS.ReadFile("/etc/timezone"); err == nil {
 		return strings.TrimSpace(string(content))
 	}
 	// Fallback: readlink /etc/localtime
-	if link, err := os.Readlink("/etc/localtime"); err == nil {
+	if link, err := ctx.FS.Readlink("/etc/localtime"); err == nil {
 		// /usr/share/zoneinfo/Europe/Istanbul -> Europe/Istanbul
 		parts := strings.Split(link, "zoneinfo/")
 		if len(parts) > 1 {
@@ -194,12 +195,12 @@ func detectTimezone() string {
 	return "UTC"
 }
 
-func detectFS(path string) core.SystemFS {
+func detectFS(ctx *core.SystemContext, path string) core.SystemFS {
 	// mount komutunun çıktısı veya /proc/mounts
 	// Basitçe root path için /proc/mounts taraması
 	fs := core.SystemFS{RootFSType: "unknown"}
 
-	f, err := os.Open("/proc/mounts")
+	f, err := ctx.FS.Open("/proc/mounts")
 	if err != nil {
 		return fs
 	}
@@ -227,10 +228,10 @@ func strLimit(s string, limit int) string {
 	return s
 }
 
-func detectKernel() string {
-	out, err := exec.Command("uname", "-r").Output()
+func detectKernel(ctx *core.SystemContext) string {
+	out, err := ctx.Transport.Execute(ctx.Context, "uname -r")
 	if err != nil {
 		return "unknown"
 	}
-	return strings.TrimSpace(string(out))
+	return strings.TrimSpace(out)
 }

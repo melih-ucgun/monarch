@@ -30,7 +30,8 @@ var planCmd = &cobra.Command{
 		// Force DryRun in Context?
 		// Engine.Plan doesn't modify anything, but context might affect templates.
 		// We use standard context.
-		ctx := system.Detect(false)
+		ctx := core.NewSystemContext(false)
+		system.Detect(ctx)
 		ctx.DryRun = true // explicit
 
 		// 2. Load Config

@@ -43,7 +43,8 @@ var addCmd = &cobra.Command{
 
 		pterm.Info.Printf("Adding resources to: %s\n", configPath)
 
-		ctx := system.Detect(false)
+		ctx := core.NewSystemContext(false)
+		system.Detect(ctx)
 		addedCount := 0
 
 		for _, arg := range args {

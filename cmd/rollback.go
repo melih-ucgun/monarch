@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/state"
 	"github.com/melih-ucgun/veto/internal/system"
 	"github.com/pterm/pterm"
@@ -88,7 +89,8 @@ func revertChange(change state.TransactionChange) error {
 		// This is tricky without fully initializing the Engine/System context.
 		// Let's quick-detect system.
 		// Let's quick-detect system.
-		_ = system.Detect(false) // Ignore result for now since we just log warning
+		ctx := core.NewSystemContext(false)
+		system.Detect(ctx)
 
 		// We can reuse PkgAdapter but we need to know the type?
 		// Actually Type is "pkg", but underlying adapter depends on distro.

@@ -13,8 +13,8 @@ func DiscoverPackages(ctx *core.SystemContext) ([]string, error) {
 }
 
 // DiscoverServices scans for services
-func DiscoverServices(initSystem string) ([]string, error) {
-	return discoverServices(initSystem)
+func DiscoverServices(ctx *core.SystemContext) ([]string, error) {
+	return discoverServices(ctx)
 }
 
 // DiscoverSystem scans the system and returns a generated configuration.
@@ -39,7 +39,7 @@ func DiscoverSystem(ctx *core.SystemContext) (*config.Config, error) {
 	}
 
 	// 2. Discover Services
-	services, err := DiscoverServices(ctx.InitSystem)
+	services, err := DiscoverServices(ctx)
 	if err != nil {
 		fmt.Printf("Warning: Service discovery failed: %v\n", err)
 	}

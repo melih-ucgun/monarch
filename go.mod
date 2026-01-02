@@ -5,10 +5,10 @@ go 1.25.5
 require (
 	atomicgo.dev/cursor v0.2.0
 	github.com/expr-lang/expr v1.17.7
-	github.com/hexops/gotextdiff v1.0.3
 	github.com/joho/godotenv v1.5.1
 	github.com/pkg/sftp v1.13.10
 	github.com/pterm/pterm v0.12.82
+	github.com/sergi/go-diff v1.4.0
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/crypto v0.46.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -24,7 +24,6 @@ require (
 	github.com/lithammer/fuzzysearch v1.1.8 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/sys v0.39.0 // indirect

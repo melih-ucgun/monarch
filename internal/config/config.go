@@ -8,6 +8,7 @@ import (
 	"github.com/joho/godotenv"
 	"gopkg.in/yaml.v3"
 
+	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/crypto"
 	"github.com/melih-ucgun/veto/internal/system"
 	"github.com/pterm/pterm"
@@ -56,7 +57,8 @@ func LoadConfig(path string) (*Config, error) {
 
 	// 0. Detect System & Set VETO_ VARIABLES for Template Expansion
 	// This happens BEFORE loading config so {{.OS}} works in 'includes'
-	ctx := system.Detect(false) // Lightweight detection
+	ctx := core.NewSystemContext(false)
+	system.Detect(ctx) // Lightweight detection
 	os.Setenv("VETO_OS", ctx.OS)
 	os.Setenv("VETO_DISTRO", ctx.Distro)
 	os.Setenv("VETO_HOSTNAME", ctx.Hostname)

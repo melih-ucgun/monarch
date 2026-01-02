@@ -35,7 +35,8 @@ func runInit() {
 		Println("Veto System Initializer")
 
 	spinner, _ := pterm.DefaultSpinner.Start("Scanning system...")
-	detectedCtx := system.Detect(false)
+	detectedCtx := core.NewSystemContext(false)
+	system.Detect(detectedCtx)
 	spinner.Success("System scan complete")
 	pterm.Println()
 

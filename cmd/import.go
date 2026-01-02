@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/melih-ucgun/veto/internal/config"
+	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/discovery"
 	"github.com/melih-ucgun/veto/internal/system"
 	"github.com/pterm/pterm"
@@ -38,7 +39,8 @@ func RunImportInteractive(outputFile string, nonInteractive bool) {
 	pterm.DefaultHeader.Println("System Discovery & Import")
 	spinner, _ := pterm.DefaultSpinner.Start("Detecting system context...")
 
-	ctx := system.Detect(false)
+	ctx := core.NewSystemContext(false)
+	system.Detect(ctx)
 
 	spinner.UpdateText("Discovering packages and services...")
 
@@ -49,7 +51,7 @@ func RunImportInteractive(outputFile string, nonInteractive bool) {
 		return
 	}
 
-	services, err := discovery.DiscoverServices(ctx.InitSystem)
+	services, err := discovery.DiscoverServices(ctx)
 	if err != nil {
 		pterm.Warning.Printf("Service discovery failed: %v\n", err)
 	}
