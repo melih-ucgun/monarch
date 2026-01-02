@@ -34,11 +34,32 @@ func TestExecuteTemplate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "Eksik Değişken (Default Davranış)",
+			name:    "Eksik Değişken (Zero Davranış)",
 			content: "Değer: {{ .yok }}",
 			vars:    map[string]interface{}{},
+			want:    "Değer: <no value>",
+			wantErr: false,
+		},
+		{
+			name:    "Sprig Required (Zorunlu Alan)",
+			content: "Değer: {{ required \"warn\" .yok }}",
+			vars:    map[string]interface{}{},
 			want:    "",
-			wantErr: true, // Implementation uses Option("missingkey=error")
+			wantErr: true,
+		},
+		{
+			name:    "Sprig Fonksiyonları (Upper)",
+			content: "{{ \"hello\" | upper }}",
+			vars:    nil,
+			want:    "HELLO",
+			wantErr: false,
+		},
+		{
+			name:    "Sprig Fonksiyonları (Default)",
+			content: "Değer: {{ .val | default \"varsayilan\" }}",
+			vars:    map[string]interface{}{},
+			want:    "Değer: varsayilan",
+			wantErr: false,
 		},
 	}
 

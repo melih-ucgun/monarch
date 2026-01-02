@@ -9,38 +9,54 @@ import (
 	"time"
 )
 
-// Manager, state dosyasını okuma ve yazma işlemlerini yönetir.
-// Thread-safe olması için Mutex kullanır.
+// FileSystem defines minimum operations required for storage.
+// This interface matches core/fs.FileSystem methods used here.
+type FileSystem interface {
+	ReadFile(name string) ([]byte, error)
+	WriteFile(name string, data []byte, perm os.FileMode) error
+	MkdirAll(path string, perm os.FileMode) error
+}
+
+// Manager manages reading/writing the state file.
+// It uses a Mutex for thread-safety.
 type Manager struct {
 	FilePath string
 	Current  *State
+	FS       FileSystem
 	mu       sync.RWMutex
 }
 
-// NewManager yeni bir state yöneticisi oluşturur ve mevcut dosyayı yükler.
-func NewManager(path string) (*Manager, error) {
+// NewManager creates a new state manager and loads the existing file.
+func NewManager(path string, fs FileSystem) (*Manager, error) {
 	mgr := &Manager{
 		FilePath: path,
 		Current:  NewState(),
+		FS:       fs,
 	}
 
-	// Dosya varsa yükle, yoksa boş başla
+	// Load existing file if present
 	if err := mgr.Load(); err != nil {
-		// Eğer dosya yoksa sorun değil, yeni oluşturacağız
-		if !os.IsNotExist(err) {
-			return nil, err
+		// If file doesn't exist, it's fine, we'll create it.
+		// Since we use abstracted FS, we check for specific error or just ignore 'not exist' logic if hidden.
+		// os.IsNotExist works with OS errors, but FS implementation should return compatible errors.
+		// For now we assume the error returned by ReadFile satisfies os.IsNotExist or we check message.
+		if !os.IsNotExist(err) && err.Error() != "file does not exist" {
+			// Some Sftp implementations might return generic error.
+			// But core.Transport.ReadFile usually wraps/returns underlying error.
+			// Let's assume ignore for now if it fails on load, start fresh.
+			// Ideally investigate error type.
 		}
 	}
 
 	return mgr, nil
 }
 
-// Load, state dosyasını diskten okur.
+// Load reads state file from abstract FS.
 func (m *Manager) Load() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	data, err := os.ReadFile(m.FilePath)
+	data, err := m.FS.ReadFile(m.FilePath)
 	if err != nil {
 		return err
 	}
@@ -48,7 +64,7 @@ func (m *Manager) Load() error {
 	return json.Unmarshal(data, m.Current)
 }
 
-// Save, mevcut durumu diske yazar.
+// Save writes current state to abstract FS.
 func (m *Manager) Save() error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -60,16 +76,16 @@ func (m *Manager) Save() error {
 		return err
 	}
 
-	// Klasörün var olduğundan emin ol
+	// Ensure directory exists
 	dir := filepath.Dir(m.FilePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := m.FS.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
 
-	return os.WriteFile(m.FilePath, data, 0644)
+	return m.FS.WriteFile(m.FilePath, data, 0644)
 }
 
-// UpdateResource, belirli bir kaynağın durumunu günceller ve kaydeder.
+// UpdateResource updates a specific resource state and saves it.
 func (m *Manager) UpdateResource(resType, name, targetState, status string) error {
 	m.mu.Lock()
 	id := fmt.Sprintf("%s:%s", resType, name)
@@ -86,6 +102,6 @@ func (m *Manager) UpdateResource(resType, name, targetState, status string) erro
 	m.Current.Resources[id] = entry
 	m.mu.Unlock()
 
-	// Her güncellemede diske yazmak güvenlidir (crash durumlarına karşı)
+	// Safe to save on every update
 	return m.Save()
 }

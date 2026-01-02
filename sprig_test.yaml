@@ -1,0 +1,9 @@
+resources:
+  - type: file
+    name: /tmp/sprig_demo.txt
+    params:
+      content: |
+        User: {{ .User | upper | default "UNKNOWN" }}
+        OS: {{ .OS | quote }}
+        List: {{ list "a" "b" "c" | join ", " | upper }}
+        Math: {{ add 10 32 }}

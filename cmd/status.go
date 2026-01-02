@@ -7,6 +7,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -17,7 +18,8 @@ var statusCmd = &cobra.Command{
 	Long:  `Displays a list of resources managed by Veto and their last known status from the state file.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		statePath := filepath.Join(".veto", "state.json")
-		mgr, err := state.NewManager(statePath)
+		// Status command typically runs locally, so we use RealFS
+		mgr, err := state.NewManager(statePath, &core.RealFS{})
 		if err != nil {
 			fmt.Printf("❌ Could not load state file: %v\n", err)
 			return

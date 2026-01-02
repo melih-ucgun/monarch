@@ -139,7 +139,8 @@ func runApply(configFile, invFile string, concurrency int, isDryRun bool, skipSn
 
 	// 2. Initialize State Manager
 	statePath := filepath.Join(".veto", "state.json")
-	stateMgr, err := state.NewManager(statePath)
+	// Use ctx.Transport.GetFileSystem() for remote state capability
+	stateMgr, err := state.NewManager(statePath, ctx.Transport.GetFileSystem())
 	if err != nil {
 		pterm.Warning.Printf("Could not initialize state manager: %v\n", err)
 	}
