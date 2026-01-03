@@ -96,11 +96,21 @@ func (r *PacmanAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 }
 
 func (r *PacmanAdapter) Revert(ctx *core.SystemContext) error {
-	if r.ActionPerformed == "installed" {
+	return r.RevertAction("installed", ctx)
+}
+
+func (r *PacmanAdapter) RevertAction(action string, ctx *core.SystemContext) error {
+	// Revert the given action
+	if action == "installed" {
+		// Undo install -> Remove
 		_, err := runCommand("pacman", "-Rns", "--noconfirm", r.Name)
 		return err
+	} else if action == "removed" {
+		// Undo remove -> Install
+		_, err := runCommand("pacman", "-S", "--noconfirm", "--needed", r.Name)
+		return err
 	}
-	return nil
+	return fmt.Errorf("unknown action to revert: %s", action)
 }
 
 // ListInstalled returns a list of explicitly installed packages.

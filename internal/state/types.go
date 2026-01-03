@@ -13,11 +13,29 @@ type ResourceEntry struct {
 	Metadata    map[string]interface{} `json:"metadata"`     // Ekstra bilgiler (version, hash vb.)
 }
 
+// TransactionChange represents a single change within a transaction.
+type TransactionChange struct {
+	Type       string `json:"type"`
+	Name       string `json:"name"`
+	Action     string `json:"action"`
+	Target     string `json:"target,omitempty"`
+	BackupPath string `json:"backup_path,omitempty"`
+}
+
+// Transaction represents a session of changes (e.g. one apply run).
+type Transaction struct {
+	ID        string              `json:"id"`
+	Timestamp time.Time           `json:"timestamp"`
+	Status    string              `json:"status"` // success, failed, reverted
+	Changes   []TransactionChange `json:"changes"`
+}
+
 // State, tüm sistemin o anki snapshot'ıdır.
 type State struct {
 	Version   string                   `json:"version"` // State dosya versiyonu
 	LastRun   time.Time                `json:"last_run"`
 	Resources map[string]ResourceEntry `json:"resources"`
+	History   []Transaction            `json:"history,omitempty"` // Log of actions
 }
 
 func NewState() *State {

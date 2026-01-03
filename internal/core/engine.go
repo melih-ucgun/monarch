@@ -5,14 +5,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pterm/pterm"
 
 	"github.com/melih-ucgun/veto/internal/state"
 )
 
 // StateUpdater interface allows Engine to be independent of the state package.
+// StateUpdater interface allows Engine to be independent of the state package.
 type StateUpdater interface {
 	UpdateResource(resType, name, targetState, status string) error
+	AddTransaction(tx state.Transaction) error
 }
 
 // ConfigItem is the raw configuration part that the engine will process.
@@ -59,8 +62,8 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 
 	// Transaction recording
 	transaction := state.Transaction{
-		ID:        state.GenerateID(),
-		Timestamp: time.Now().Format(time.RFC3339),
+		ID:        uuid.New().String(),
+		Timestamp: time.Now(),
 		Status:    "success",
 		Changes:   []state.TransactionChange{},
 	}
@@ -102,7 +105,7 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 			change := state.TransactionChange{
 				Type:   item.Type,
 				Name:   item.Name,
-				Action: "applied", // Could be more specific based on result message
+				Action: "applied",
 			}
 
 			// Try to get target path (specifically for file)
@@ -146,9 +149,8 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 	}
 
 	// Save History
-	if !e.Context.DryRun {
-		hm := state.NewHistoryManager("")
-		if err := hm.AddTransaction(transaction); err != nil {
+	if !e.Context.DryRun && e.StateUpdater != nil {
+		if err := e.StateUpdater.AddTransaction(transaction); err != nil {
 			fmt.Printf("⚠️ Warning: Failed to save history: %v\n", err)
 		}
 	}
@@ -168,8 +170,8 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 
 	// Transaction recording
 	transaction := state.Transaction{
-		ID:        state.GenerateID(),
-		Timestamp: time.Now().Format(time.RFC3339),
+		ID:        uuid.New().String(),
+		Timestamp: time.Now(),
 		Status:    "success",
 		Changes:   []state.TransactionChange{},
 	}
@@ -352,9 +354,8 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 	}
 
 	// Save History
-	if !e.Context.DryRun {
-		hm := state.NewHistoryManager("")
-		if err := hm.AddTransaction(transaction); err != nil {
+	if !e.Context.DryRun && e.StateUpdater != nil {
+		if err := e.StateUpdater.AddTransaction(transaction); err != nil {
 			fmt.Printf("⚠️ Warning: Failed to save history: %v\n", err)
 		}
 	}

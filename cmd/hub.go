@@ -11,102 +11,82 @@ import (
 
 var hubCmd = &cobra.Command{
 	Use:   "hub",
-	Short: "Interact with Veto Hub",
-	Long:  `Search, install, and manage RuleSets from Veto Hub.`,
+	Short: "Manage recipes from the Veto Registry",
+	Long:  `Search, update, and install recipes from the community registry.`,
+}
+
+var hubUpdateCmd = &cobra.Command{
+	Use:   "update",
+	Short: "Update the local registry index",
+	Run: func(cmd *cobra.Command, args []string) {
+		client := hub.NewHubClient("")
+		if err := client.Update(); err != nil {
+			pterm.Error.Printf("Failed to update registry: %v\n", err)
+			os.Exit(1)
+		}
+		pterm.Success.Println("Registry updated successfully")
+	},
 }
 
 var hubSearchCmd = &cobra.Command{
 	Use:   "search [query]",
-	Short: "Search for rulesets",
+	Short: "Search for recipes",
 	Run: func(cmd *cobra.Command, args []string) {
 		query := ""
 		if len(args) > 0 {
 			query = args[0]
 		}
-		client := hub.NewHubClient()
+
+		client := hub.NewHubClient("")
 		results, err := client.Search(query)
 		if err != nil {
-			pterm.Error.Println("Search failed:", err)
+			pterm.Error.Printf("Search failed: %v\n", err)
 			return
 		}
 
-		pterm.DefaultHeader.Printf("Hub Search Results: '%s'\n", query)
 		if len(results) == 0 {
-			pterm.Info.Println("No rulesets found.")
+			pterm.Info.Println("No recipes found matching your query.")
 			return
 		}
 
-		tableData := [][]string{{"Name"}}
-		for _, r := range results {
-			tableData = append(tableData, []string{r})
+		pterm.DefaultSection.Printf("Found %d recipes:", len(results))
+		for _, name := range results {
+			pterm.Println(" - " + name)
 		}
-		pterm.DefaultTable.WithHasHeader().WithData(tableData).Render()
 	},
 }
 
 var hubInstallCmd = &cobra.Command{
-	Use:   "install [ruleset]",
-	Short: "Install a ruleset to the active recipe",
-	Args:  cobra.ExactArgs(1),
+	Use:   "install [recipe_name] [as_name]",
+	Short: "Install a recipe",
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		rulesetName := args[0]
-
-		mgr := hub.NewRecipeManager("")
-		activeDir, err := mgr.GetActiveRecipeDir()
-		if err != nil {
-			pterm.Error.Println("Failed to get active recipe:", err)
-			return
+		recipeName := args[0]
+		targetName := recipeName
+		if len(args) > 1 {
+			targetName = args[1]
 		}
 
-		rulesetsDir := filepath.Join(activeDir, "rulesets")
+		// Determine target directory
+		home, _ := os.UserHomeDir()
+		recipesDir := filepath.Join(home, ".veto", "recipes")
+		targetDir := filepath.Join(recipesDir, targetName)
 
-		pterm.Info.Printf("Installing '%s' to %s...\n", rulesetName, rulesetsDir)
+		pterm.Info.Printf("Installing '%s' to '%s'...\n", recipeName, targetName)
 
-		client := hub.NewHubClient()
-		if err := client.Install(rulesetName, rulesetsDir); err != nil {
-			pterm.Error.Println("Failed to install ruleset:", err)
-			return
+		client := hub.NewHubClient("")
+		if err := client.Install(recipeName, targetDir); err != nil {
+			pterm.Error.Printf("Installation failed: %v\n", err)
+			os.Exit(1)
 		}
 
-		pterm.Success.Printf("RuleSet '%s' installed successfully.\n", rulesetName)
-		pterm.Info.Println("Tip: Add the ruleset to your system.yaml to enable it.")
-	},
-}
-
-var hubRemoveCmd = &cobra.Command{
-	Use:   "remove [ruleset]",
-	Short: "Remove a ruleset from the active recipe",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		rulesetName := args[0]
-
-		mgr := hub.NewRecipeManager("")
-		activeDir, err := mgr.GetActiveRecipeDir()
-		if err != nil {
-			pterm.Error.Println("Failed to get active recipe:", err)
-			return
-		}
-
-		targetDir := filepath.Join(activeDir, "rulesets", rulesetName)
-
-		// Safety check
-		if _, err := os.Stat(targetDir); os.IsNotExist(err) {
-			pterm.Error.Printf("RuleSet '%s' not found.\n", rulesetName)
-			return
-		}
-
-		if err := os.RemoveAll(targetDir); err != nil {
-			pterm.Error.Println("Failed to remove ruleset:", err)
-			return
-		}
-
-		pterm.Success.Printf("RuleSet '%s' removed.\n", rulesetName)
+		pterm.Success.Printf("Recipe installed! Use it with: veto apply %s\n", targetName)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(hubCmd)
+	hubCmd.AddCommand(hubUpdateCmd)
 	hubCmd.AddCommand(hubSearchCmd)
 	hubCmd.AddCommand(hubInstallCmd)
-	hubCmd.AddCommand(hubRemoveCmd)
 }

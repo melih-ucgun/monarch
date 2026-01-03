@@ -78,10 +78,14 @@ func (r *AptAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 }
 
 func (r *AptAdapter) Revert(ctx *core.SystemContext) error {
-	if r.ActionPerformed == "installed" {
+	return r.RevertAction(r.ActionPerformed, ctx)
+}
+
+func (r *AptAdapter) RevertAction(action string, ctx *core.SystemContext) error {
+	if action == "installed" {
 		_, err := runCommand("apt-get", "remove", "-y", r.Name)
 		return err
-	} else if r.ActionPerformed == "removed" {
+	} else if action == "removed" {
 		_, err := runCommand("apt-get", "install", "-y", r.Name)
 		return err
 	}

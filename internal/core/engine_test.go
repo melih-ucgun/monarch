@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/melih-ucgun/veto/internal/state"
 )
 
 // MockTransport implements core.Transport
@@ -65,6 +67,10 @@ func (m *MockStateUpdater) UpdateResource(resType, name, targetState, status str
 	m.Updates = append(m.Updates, struct {
 		Type, Name, TargetState, Status string
 	}{resType, name, targetState, status})
+	return nil
+}
+
+func (m *MockStateUpdater) AddTransaction(tx state.Transaction) error {
 	return nil
 }
 

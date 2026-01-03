@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"time"
 
+	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/state"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -13,12 +13,14 @@ var logCmd = &cobra.Command{
 	Use:   "log",
 	Short: "View application transacion log",
 	Run: func(cmd *cobra.Command, args []string) {
-		hm := state.NewHistoryManager("")
-		history, err := hm.LoadHistory()
+		fs := core.RealFS{}
+		mgr, err := state.NewManager(".veto/state.json", &fs)
 		if err != nil {
-			pterm.Error.Println("Failed to load history:", err)
+			pterm.Error.Println("Failed to load state:", err)
 			return
 		}
+
+		history := mgr.GetTransactions()
 
 		if len(history) == 0 {
 			pterm.Info.Println("No transaction log found.")
@@ -32,8 +34,7 @@ var logCmd = &cobra.Command{
 		// Show latest first (reverse iteration)
 		for i := len(history) - 1; i >= 0; i-- {
 			tx := history[i]
-			t, _ := time.Parse(time.RFC3339, tx.Timestamp)
-			dateStr := t.Format("2006-01-02 15:04:05")
+			dateStr := tx.Timestamp.Format("2006-01-02 15:04:05")
 
 			statusStyle := pterm.NewStyle(pterm.FgGreen)
 			if tx.Status == "failed" {

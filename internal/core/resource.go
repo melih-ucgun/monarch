@@ -18,6 +18,7 @@ type Differ interface {
 // Revertable is the interface that revertible resources must implement.
 type Revertable interface {
 	Revert(ctx *SystemContext) error
+	RevertAction(action string, ctx *SystemContext) error
 }
 
 // Lister is the interface for resources that can enumerate installed instances.
