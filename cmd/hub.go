@@ -74,10 +74,22 @@ var hubInstallCmd = &cobra.Command{
 
 		pterm.Info.Printf("Installing '%s' to '%s'...\n", recipeName, targetName)
 
-		client := hub.NewHubClient("")
-		if err := client.Install(recipeName, targetDir); err != nil {
-			pterm.Error.Printf("Installation failed: %v\n", err)
-			os.Exit(1)
+		pterm.Info.Printf("Installing '%s' to '%s'...\n", recipeName, targetName)
+
+		if len(recipeName) > 6 && recipeName[:6] == "oci://" {
+			// OCI Installation
+			client := hub.NewOCIClient()
+			if err := client.Pull(recipeName, targetDir); err != nil {
+				pterm.Error.Printf("OCI Pull failed: %v\n", err)
+				os.Exit(1)
+			}
+		} else {
+			// Standard Git Installation
+			client := hub.NewHubClient("")
+			if err := client.Install(recipeName, targetDir); err != nil {
+				pterm.Error.Printf("Installation failed: %v\n", err)
+				os.Exit(1)
+			}
 		}
 
 		pterm.Success.Printf("Recipe installed! Use it with: veto apply %s\n", targetName)

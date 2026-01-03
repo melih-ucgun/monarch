@@ -68,6 +68,13 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 		Changes:   []state.TransactionChange{},
 	}
 
+	// Initialize Backup Manager for this transaction
+	// Since contexts are shared in Run (sequential), we can set it on the main context
+	// BUT parallel run shares context too? RunParallel creates goroutines sharing e.Context.
+	// We must be careful if Engine is reused. But typically Engine is per-run.
+	e.Context.TxID = transaction.ID
+	e.Context.BackupManager = state.NewBackupManager("") // Use default path
+
 	for _, item := range items {
 		// Params preparation
 		if item.Params == nil {
@@ -176,6 +183,10 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 		Changes:   []state.TransactionChange{},
 	}
 	var txMu sync.Mutex
+
+	// Initialize Backup Manager
+	e.Context.TxID = transaction.ID
+	e.Context.BackupManager = state.NewBackupManager("") // Use default path
 
 	for _, item := range layer {
 		wg.Add(1)

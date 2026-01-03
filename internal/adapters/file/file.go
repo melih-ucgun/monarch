@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/melih-ucgun/veto/internal/core"
+	"github.com/pterm/pterm"
 )
 
 func init() {
@@ -54,6 +55,8 @@ func NewFileAdapter(name string, params map[string]interface{}) core.Resource {
 		method = "copy"
 	}
 
+	backupPath, _ := params["backup_path"].(string)
+
 	return &FileAdapter{
 		BaseResource: core.BaseResource{Name: name, Type: "file"},
 		Path:         path,
@@ -62,7 +65,45 @@ func NewFileAdapter(name string, params map[string]interface{}) core.Resource {
 		Method:       method,
 		Mode:         mode,
 		State:        state,
+		BackupPath:   backupPath,
 	}
+}
+
+// RevertAction implements the Revertable interface for smart rollback
+func (r *FileAdapter) RevertAction(action string, ctx *core.SystemContext) error {
+	// For files, "applied" usually means created or modified.
+	// If we have a backup, restore it.
+	if r.BackupPath != "" {
+		pterm.Info.Printf("Restoring backup from %s to %s\n", r.BackupPath, r.Path)
+		if ctx.BackupManager != nil {
+			// Use BackupManager to restore (safe copy)
+			// Wait, BackupManager is in State package, context holds interface.
+			// Currently BackupManager interface in context is: CreateBackup.
+			// We might need RestoreBackup in interface too?
+			// Or just simple copy here.
+			// Let's use simple copy internal helper r.copyFile since we have it.
+			return r.copyFile(ctx, r.BackupPath, r.Path, r.Mode)
+		}
+		// Fallback copy
+		return r.copyFile(ctx, r.BackupPath, r.Path, r.Mode)
+	}
+
+	// If no backup, and action was "applied" (created/modified):
+	// If it was created (previously absent), we should delete it?
+	// But we don't know if it was created or modified unless history says so.
+	// History says "Action: applied".
+	// If pre-state was "absent", then we delete.
+	// TransactionChange structure doesn't easily show pre-state without loading full Transaction.
+	// But let's assume if no backup, we can't safely revert modification.
+	// However, if we follow the rule: "If file rollback logic", we blindly revert to "absent" if no backup? No, dangerous.
+	// Safe bet: Only restore if backup exists. Or if we explicitely know it was "created".
+	// For now, rely on backup.
+	if action == "applied" && r.BackupPath == "" {
+		pterm.Warning.Printf("No backup found for %s. Skipping rollback of modification.\n", r.Path)
+		return nil
+	}
+
+	return nil
 }
 
 func (r *FileAdapter) Validate(ctx *core.SystemContext) error {
@@ -204,8 +245,8 @@ func (r *FileAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 	}
 
 	// YEDEKLEME
-	if core.GlobalBackup != nil {
-		backupPath, err := core.GlobalBackup.BackupFile(r.Path)
+	if ctx.BackupManager != nil && ctx.TxID != "" {
+		backupPath, err := ctx.BackupManager.CreateBackup(ctx.TxID, r.Path)
 		if err == nil {
 			r.BackupPath = backupPath
 		} else {

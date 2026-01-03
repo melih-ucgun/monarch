@@ -52,6 +52,12 @@ type SystemContext struct {
 	// Logger veya Output (İleride loglama için)
 	Stdout io.Writer `yaml:"-"`
 	Stderr io.Writer `yaml:"-"`
+
+	// Transaction Context
+	TxID          string      `yaml:"-"`
+	BackupManager interface { // Avoid direct dependency cycle if possible, or use state.BackupManager
+		CreateBackup(txID, sourcePath string) (string, error)
+	} `yaml:"-"`
 }
 
 type SystemHardware struct {

@@ -82,7 +82,12 @@ func performRollback(change state.TransactionChange, ctx *core.SystemContext) er
 	}
 
 	// 2. Create Resource Instance
-	res, err := resource.CreateResourceWithParams(resType, resName, nil, ctx)
+	params := make(map[string]interface{})
+	if change.BackupPath != "" {
+		params["backup_path"] = change.BackupPath
+	}
+
+	res, err := resource.CreateResourceWithParams(resType, resName, params, ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create resource factory: %w", err)
 	}
