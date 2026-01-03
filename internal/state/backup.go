@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/melih-ucgun/veto/internal/consts"
 )
 
 // BackupManager handles creating copies of files before modification
@@ -19,7 +21,7 @@ func NewBackupManager(baseDir string) *BackupManager {
 		// but Manager usually passes the base state path.
 		// Let's assume absolute path passed or handle standard location.
 		home, _ := os.UserHomeDir()
-		baseDir = filepath.Join(home, ".veto", "backups")
+		baseDir = filepath.Join(home, consts.GetVetoDir(), consts.BackupDirName)
 	}
 	return &BackupManager{BaseDir: baseDir}
 }

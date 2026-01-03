@@ -8,20 +8,29 @@ import (
 	"strings"
 	"time"
 
-	"github.com/melih-ucgun/veto/internal/config"
 	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
 
+type HostConfig struct {
+	Name           string
+	Address        string
+	User           string
+	Port           int
+	SSHKeyPath     string
+	BecomeMethod   string
+	BecomePassword string
+}
+
 type SSHTransport struct {
 	client     *ssh.Client
 	sftpClient *sftp.Client
 	sftpFS     *SFTPFS
-	config     config.Host
+	config     HostConfig
 }
 
-func NewSSHTransport(ctx context.Context, host config.Host) (*SSHTransport, error) {
+func NewSSHTransport(ctx context.Context, host HostConfig) (*SSHTransport, error) {
 	var authMethods []ssh.AuthMethod
 
 	if host.SSHKeyPath != "" {

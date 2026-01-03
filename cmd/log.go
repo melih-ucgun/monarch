@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/state"
 	"github.com/pterm/pterm"
@@ -14,7 +15,7 @@ var logCmd = &cobra.Command{
 	Short: "View application transacion log",
 	Run: func(cmd *cobra.Command, args []string) {
 		fs := core.RealFS{}
-		mgr, err := state.NewManager(".veto/state.json", &fs)
+		mgr, err := state.NewManager(consts.GetStateFilePath(), &fs)
 		if err != nil {
 			pterm.Error.Println("Failed to load state:", err)
 			return

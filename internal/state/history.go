@@ -2,10 +2,12 @@ package state
 
 import (
 	"fmt"
+
+	"github.com/melih-ucgun/veto/internal/types"
 )
 
 // AddTransaction appends a new transaction to history and saves state.
-func (m *Manager) AddTransaction(tx Transaction) error {
+func (m *Manager) AddTransaction(tx types.Transaction) error {
 	m.mu.Lock()
 	m.Current.History = append(m.Current.History, tx)
 	m.mu.Unlock()
@@ -14,18 +16,18 @@ func (m *Manager) AddTransaction(tx Transaction) error {
 }
 
 // GetTransactions returns a copy of history.
-func (m *Manager) GetTransactions() []Transaction {
+func (m *Manager) GetTransactions() []types.Transaction {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	// Return a copy to avoid race conditions
-	history := make([]Transaction, len(m.Current.History))
+	history := make([]types.Transaction, len(m.Current.History))
 	copy(history, m.Current.History)
 	return history
 }
 
 // GetTransaction finds a transaction by ID.
-func (m *Manager) GetTransaction(id string) (Transaction, error) {
+func (m *Manager) GetTransaction(id string) (types.Transaction, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -34,7 +36,7 @@ func (m *Manager) GetTransaction(id string) (Transaction, error) {
 			return tx, nil
 		}
 	}
-	return Transaction{}, fmt.Errorf("transaction not found: %s", id)
+	return types.Transaction{}, fmt.Errorf("transaction not found: %s", id)
 }
 
 // NewHistoryManager is a helper to get a manager specifically for history lookup.

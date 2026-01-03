@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/melih-ucgun/veto/internal/state"
+	"github.com/melih-ucgun/veto/internal/types"
 )
 
 // MockTransport implements core.Transport
@@ -78,7 +78,7 @@ func (m *MockStateUpdater) UpdateResource(resType, name, targetState, status str
 	return nil
 }
 
-func (m *MockStateUpdater) AddTransaction(tx state.Transaction) error {
+func (m *MockStateUpdater) AddTransaction(tx types.Transaction) error {
 	return nil
 }
 

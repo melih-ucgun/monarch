@@ -3,9 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"atomicgo.dev/cursor"
+	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/system"
 	"github.com/melih-ucgun/veto/internal/transport"
@@ -19,7 +19,7 @@ var autoConfirm bool
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize Veto system profile",
-	Long:  `Scans the current system and creates a '.veto/system.yaml' profile used for context-aware operations.`,
+	Long:  fmt.Sprintf(`Scans the current system and creates a '%s' profile used for context-aware operations.`, consts.GetSystemProfilePath()),
 	Run: func(cmd *cobra.Command, args []string) {
 		runInit()
 	},
@@ -72,7 +72,7 @@ func runInit() {
 		os.Exit(1)
 	}
 
-	pterm.Success.Println("System profile saved to .veto/system.yaml")
+	pterm.Success.Printf("System profile saved to %s\n", consts.GetSystemProfilePath())
 
 	// Offer to Import Resources
 	pterm.Println()
@@ -144,12 +144,12 @@ func ask(label, current string) string {
 
 func saveSystemProfile(ctx *core.SystemContext) error {
 	// Create .veto dir if not exists
-	vetoDir := ".veto"
+	vetoDir := consts.GetVetoDir()
 	if err := os.MkdirAll(vetoDir, 0755); err != nil {
 		return err
 	}
 
-	filePath := filepath.Join(vetoDir, "system.yaml")
+	filePath := consts.GetSystemProfilePath()
 	data, err := yaml.Marshal(ctx)
 	if err != nil {
 		return err

@@ -4,13 +4,11 @@ import (
 	"context"
 	"testing"
 	"time"
-
-	"github.com/melih-ucgun/veto/internal/config"
 )
 
 func TestNewSSHTransport(t *testing.T) {
 	// HostName alanı Name olarak güncellendi
-	host := config.Host{
+	host := HostConfig{
 		Name:           "test-host",
 		Address:        "127.0.0.1",
 		User:           "testuser",

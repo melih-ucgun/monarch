@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/pterm/pterm"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/melih-ucgun/veto/internal/adapters/snapshot"
 	"github.com/melih-ucgun/veto/internal/config"
+	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/fleet" // New import
 	"github.com/melih-ucgun/veto/internal/hub"
@@ -31,8 +31,8 @@ var concurrency int
 var applyCmd = &cobra.Command{
 	Use:   "apply [config_file]",
 	Short: "Apply the configuration to the system",
-	Long: `Reads the configuration file and ensures system state matches desired state.
-Updates .veto/state.json with the results.`,
+	Long: fmt.Sprintf(`Reads the configuration file and ensures system state matches desired state.
+Updates %s with the results.`, consts.GetStateFilePath()),
 	Run: func(cmd *cobra.Command, args []string) {
 		var configFile string
 		if len(args) > 0 {
@@ -87,8 +87,8 @@ func runApply(configFile, invFile string, concurrency int, isDryRun bool, skipSn
 	system.Detect(ctx)
 
 	// 1.5 Load System Profile (if exists)
-	if data, err := os.ReadFile(".veto/system.yaml"); err == nil {
-		pterm.Info.Println("Loading system profile from .veto/system.yaml")
+	if data, err := os.ReadFile(consts.GetSystemProfilePath()); err == nil {
+		pterm.Info.Printf("Loading system profile from %s\n", consts.GetSystemProfilePath())
 		// Override detected context with saved profile
 		if err := yaml.Unmarshal(data, ctx); err != nil {
 			pterm.Warning.Printf("Failed to parse system profile: %v\n", err)
@@ -138,7 +138,7 @@ func runApply(configFile, invFile string, concurrency int, isDryRun bool, skipSn
 	pterm.Println()
 
 	// 2. Initialize State Manager
-	statePath := filepath.Join(".veto", "state.json")
+	statePath := consts.GetStateFilePath()
 	// Use ctx.Transport.GetFileSystem() for remote state capability
 	stateMgr, err := state.NewManager(statePath, ctx.Transport.GetFileSystem())
 	if err != nil {

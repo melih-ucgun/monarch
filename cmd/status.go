@@ -1,9 +1,9 @@
 package cmd
 
 import (
-	"path/filepath"
 	"time"
 
+	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/state"
 	"github.com/pterm/pterm"
@@ -15,7 +15,7 @@ var statusCmd = &cobra.Command{
 	Short: "Show the current state of managed resources",
 	Long:  `Displays a list of resources managed by Veto and their last known status from the state file.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		statePath := filepath.Join(".veto", "state.json")
+		statePath := consts.GetStateFilePath()
 		// Status command typically runs locally, so we use RealFS
 		mgr, err := state.NewManager(statePath, &core.RealFS{})
 		if err != nil {

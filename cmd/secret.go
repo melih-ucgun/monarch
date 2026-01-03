@@ -3,9 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
+	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/melih-ucgun/veto/internal/crypto"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -28,7 +28,7 @@ var keygenCmd = &cobra.Command{
 		}
 		pterm.Success.Println("Generated Master Key:")
 		fmt.Println(key)
-		pterm.Info.Println("Save this key to ~/.veto/master.key or set VETO_MASTER_KEY environment variable.")
+		pterm.Info.Printf("Save this key to ~/%s/%s or set VETO_MASTER_KEY environment variable.\n", consts.DefaultDirName, consts.MasterKeyFileName)
 	},
 }
 
@@ -87,16 +87,14 @@ func getMasterKey() string {
 		return strings.TrimSpace(key)
 	}
 
-	// 2. File (~/.veto/master.key)
-	home, err := os.UserHomeDir()
-	if err == nil {
-		keyPath := filepath.Join(home, ".veto", "master.key")
+	// 2. File
+	if keyPath, err := consts.GetMasterKeyPath(); err == nil {
 		if content, err := os.ReadFile(keyPath); err == nil {
 			return strings.TrimSpace(string(content))
 		}
 	}
 
 	pterm.Error.Println("Master Key not found!")
-	pterm.Info.Println("Please set VETO_MASTER_KEY or create ~/.veto/master.key")
+	pterm.Info.Printf("Please set VETO_MASTER_KEY or create %s\n", consts.MasterKeyFileName)
 	return ""
 }

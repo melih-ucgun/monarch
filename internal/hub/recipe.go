@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/melih-ucgun/veto/internal/consts"
 )
 
 type RecipeManager struct {
@@ -16,11 +18,11 @@ type RecipeManager struct {
 func NewRecipeManager(baseDir string) *RecipeManager {
 	if baseDir == "" {
 		home, _ := os.UserHomeDir()
-		baseDir = filepath.Join(home, ".veto")
+		baseDir = filepath.Join(home, consts.GetVetoDir())
 	}
 	return &RecipeManager{
 		BaseDir:    baseDir,
-		RecipesDir: filepath.Join(baseDir, "recipes"),
+		RecipesDir: filepath.Join(baseDir, consts.RecipesDirName),
 		ActiveFile: filepath.Join(baseDir, "active_recipe"),
 	}
 }
@@ -66,7 +68,7 @@ version: "1.0"
 
 resources: []
 `, name)
-	configFile := filepath.Join(recipeDir, "system.yaml")
+	configFile := filepath.Join(recipeDir, consts.SystemProfileName)
 
 	return os.WriteFile(configFile, []byte(defaultConfig), 0644)
 }
@@ -126,7 +128,7 @@ func (m *RecipeManager) GetRecipePath(name string) (string, error) {
 		}
 		name = active
 	}
-	return filepath.Join(m.RecipesDir, name, "system.yaml"), nil
+	return filepath.Join(m.RecipesDir, name, consts.SystemProfileName), nil
 }
 
 // GetActiveRecipeDir returns the absolute path to the active recipe directory

@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/melih-ucgun/veto/internal/config"
+	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/melih-ucgun/veto/internal/hub"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -12,11 +14,11 @@ import (
 
 var ignoreCmd = &cobra.Command{
 	Use:   "ignore [pattern]...",
-	Short: "Ignore resources using .vetoignore",
-	Long:  `Add patterns to .vetoignore to exclude them from being tracked. Matches against resource names and paths.`,
+	Short: fmt.Sprintf("Ignore resources using %s", consts.IgnoreFileName),
+	Long:  fmt.Sprintf(`Add patterns to %s to exclude them from being tracked. Matches against resource names and paths.`, consts.IgnoreFileName),
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		ignoreFile := ".vetoignore"
+		ignoreFile := consts.GetIgnoreFilePath()
 		mgr, err := config.NewIgnoreManager(ignoreFile)
 		if err != nil {
 			pterm.Error.Printf("Failed to load ignore file: %v\n", err)
@@ -26,7 +28,7 @@ var ignoreCmd = &cobra.Command{
 		// Load System Config to check for conflicts
 		manager := hub.NewRecipeManager("")
 		activeRecipe, _ := manager.GetActive()
-		configPath := "system.yaml"
+		configPath := consts.GetSystemProfilePath()
 		if activeRecipe != "" {
 			path, err := manager.GetRecipePath(activeRecipe)
 			if err == nil {
@@ -47,7 +49,7 @@ var ignoreCmd = &cobra.Command{
 				pterm.Error.Printf("Failed to add '%s' to ignore list: %v\n", pattern, err)
 				continue
 			}
-			pterm.Success.Printf("Added '%s' to .vetoignore\n", pattern)
+			pterm.Success.Printf("Added '%s' to %s\n", pattern, consts.IgnoreFileName)
 
 			// Check conflict
 			if configLoaded {

@@ -3,11 +3,13 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/resource"
 	"github.com/melih-ucgun/veto/internal/state"
 	"github.com/melih-ucgun/veto/internal/system"
 	"github.com/melih-ucgun/veto/internal/transport"
+	"github.com/melih-ucgun/veto/internal/types"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
@@ -24,7 +26,7 @@ var rollbackCmd = &cobra.Command{
 
 		// Initialize State Manager
 		fs := core.RealFS{}
-		mgr, err := state.NewManager(".veto/state.json", &fs) // Use default path
+		mgr, err := state.NewManager(consts.GetStateFilePath(), &fs) // Use default path
 		if err != nil {
 			pterm.Error.Printf("Failed to load state: %v\n", err)
 			return
@@ -42,7 +44,7 @@ var rollbackCmd = &cobra.Command{
 		}
 
 		// Get last N transactions, reversed
-		toRollback := make([]state.Transaction, 0, count)
+		toRollback := make([]types.Transaction, 0, count)
 		for i := len(txs) - 1; i >= len(txs)-count; i-- {
 			toRollback = append(toRollback, txs[i])
 		}
@@ -72,7 +74,7 @@ var rollbackCmd = &cobra.Command{
 	},
 }
 
-func performRollback(change state.TransactionChange, ctx *core.SystemContext) error {
+func performRollback(change types.TransactionChange, ctx *core.SystemContext) error {
 	// 1. Identify Resource
 	resType := change.Type
 	resName := change.Name

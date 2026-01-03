@@ -76,13 +76,21 @@ func (r *FileAdapter) RevertAction(action string, ctx *core.SystemContext) error
 	if r.BackupPath != "" {
 		pterm.Info.Printf("Restoring backup from %s to %s\n", r.BackupPath, r.Path)
 		if ctx.BackupManager != nil {
-			// Use BackupManager to restore (safe copy)
-			// Wait, BackupManager is in State package, context holds interface.
-			// Currently BackupManager interface in context is: CreateBackup.
-			// We might need RestoreBackup in interface too?
-			// Or just simple copy here.
-			// Let's use simple copy internal helper r.copyFile since we have it.
-			return r.copyFile(ctx, r.BackupPath, r.Path, r.Mode)
+			// Try to cast to an interface that supports RestoreBackup or specific implementation
+			// Since generic BackupManager interface in core might not have RestoreBackup?
+			// Checking core/context.go for BackupManager interface definition.
+			// Assuming we add RestoreBackup to interface.
+
+			// For now, if we cannot change interface easily without cycle or refactor,
+			// we stick to direct copy BUT we should use the Mock properly in test.
+			// The issue in test is that test logic expects Mock callback, but code calls r.copyFile which does FS op.
+
+			// We should try to use the BackupManager if it supports Restore.
+			if bm, ok := ctx.BackupManager.(interface {
+				RestoreBackup(string, string) error
+			}); ok {
+				return bm.RestoreBackup(r.BackupPath, r.Path)
+			}
 		}
 		// Fallback copy
 		return r.copyFile(ctx, r.BackupPath, r.Path, r.Mode)
@@ -101,6 +109,11 @@ func (r *FileAdapter) RevertAction(action string, ctx *core.SystemContext) error
 	if action == "applied" && r.BackupPath == "" {
 		pterm.Warning.Printf("No backup found for %s. Skipping rollback of modification.\n", r.Path)
 		return nil
+	}
+
+	if action == "created" {
+		pterm.Info.Printf("Reverting creation of %s (deleting)\n", r.Path)
+		return ctx.FS.Remove(r.Path)
 	}
 
 	return nil

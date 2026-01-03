@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/melih-ucgun/veto/internal/types"
 )
 
 // MockRealFS implements state.FileSystem for tests using real os calls
@@ -37,11 +39,11 @@ func TestHistoryManager(t *testing.T) {
 	}
 
 	// 1. Add Transaction
-	tx := Transaction{
+	tx := types.Transaction{
 		ID:        "tx1",
 		Timestamp: time.Now(),
 		Status:    "success",
-		Changes: []TransactionChange{
+		Changes: []types.TransactionChange{
 			{Type: "pkg", Name: "vim", Action: "installed"},
 		},
 	}

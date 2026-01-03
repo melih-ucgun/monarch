@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/melih-ucgun/veto/internal/types"
 )
 
 // FileSystem defines minimum operations required for storage.
@@ -21,7 +23,7 @@ type FileSystem interface {
 // It uses a Mutex for thread-safety.
 type Manager struct {
 	FilePath string
-	Current  *State
+	Current  *types.State
 	FS       FileSystem
 	mu       sync.RWMutex
 }
@@ -30,7 +32,7 @@ type Manager struct {
 func NewManager(path string, fs FileSystem) (*Manager, error) {
 	mgr := &Manager{
 		FilePath: path,
-		Current:  NewState(),
+		Current:  types.NewState(),
 		FS:       fs,
 	}
 
@@ -90,7 +92,7 @@ func (m *Manager) UpdateResource(resType, name, targetState, status string) erro
 	m.mu.Lock()
 	id := fmt.Sprintf("%s:%s", resType, name)
 
-	entry := ResourceEntry{
+	entry := types.ResourceEntry{
 		ID:          id,
 		Name:        name,
 		Type:        resType,

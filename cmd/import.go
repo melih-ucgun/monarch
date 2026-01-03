@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/melih-ucgun/veto/internal/config"
+	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/discovery"
 	"github.com/melih-ucgun/veto/internal/system"
@@ -62,7 +63,7 @@ func RunImportInteractive(outputFile string, nonInteractive bool) {
 	pterm.Println()
 
 	// Filter Ignored Resources
-	ignoreMgr, _ := config.NewIgnoreManager(".vetoignore")
+	ignoreMgr, _ := config.NewIgnoreManager(consts.GetIgnoreFilePath())
 	if ignoreMgr != nil {
 		debugIgnored := 0
 		// Filter Packages
@@ -88,7 +89,7 @@ func RunImportInteractive(outputFile string, nonInteractive bool) {
 		services = filteredSvcs
 
 		if debugIgnored > 0 {
-			pterm.Info.Printf("Excluded %d resources matched by .vetoignore\n", debugIgnored)
+			pterm.Info.Printf("Excluded %d resources matched by %s\n", debugIgnored, consts.IgnoreFileName)
 		}
 	}
 

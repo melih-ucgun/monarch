@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/melih-ucgun/veto/internal/config"
+	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/hub"
 	"github.com/melih-ucgun/veto/internal/system"
@@ -28,7 +29,7 @@ var addCmd = &cobra.Command{
 		manager := hub.NewRecipeManager("")
 		activeRecipe, _ := manager.GetActive()
 
-		configPath := "system.yaml"
+		configPath := consts.GetSystemProfilePath()
 		if activeRecipe != "" {
 			path, err := manager.GetRecipePath(activeRecipe)
 			if err == nil {
@@ -55,9 +56,9 @@ var addCmd = &cobra.Command{
 			}
 
 			// Check Ignore List
-			ignoreMgr, _ := config.NewIgnoreManager(".vetoignore")
+			ignoreMgr, _ := config.NewIgnoreManager(consts.GetIgnoreFilePath())
 			if ignoreMgr != nil && ignoreMgr.IsIgnored(res.Name) {
-				pterm.Warning.Printf("Resource '%s' is ignored by .vetoignore. Skipping.\n", res.Name)
+				pterm.Warning.Printf("Resource '%s' is ignored by %s. Skipping.\n", res.Name, consts.IgnoreFileName)
 				continue
 			}
 
@@ -167,10 +168,10 @@ func appendResourceToConfig(path string, res config.ResourceConfig) error {
 		var storageRelPath string
 		if strings.HasPrefix(absTarget, homeDir) {
 			rel, _ := filepath.Rel(homeDir, absTarget)
-			storageRelPath = filepath.Join("files", rel) // .veto/files/...
+			storageRelPath = filepath.Join(consts.FilesDirName, rel) // .veto/files/...
 		} else {
 			// Outside home? Use full path as structure
-			storageRelPath = filepath.Join("files", "root", absTarget)
+			storageRelPath = filepath.Join(consts.FilesDirName, "root", absTarget)
 		}
 
 		// .veto directory root (where system.yaml is)

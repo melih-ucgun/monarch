@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/melih-ucgun/veto/internal/config"
 	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/inventory"
 	"github.com/melih-ucgun/veto/internal/system"
@@ -63,7 +62,7 @@ func (f *FleetManager) ApplyConfig(layers [][]core.ConfigItem, concurrency int, 
 					port = 22
 				}
 
-				sshConfig := config.Host{
+				sshConfig := transport.HostConfig{
 					Name:       h.Name,
 					Address:    h.Address,
 					User:       h.User,

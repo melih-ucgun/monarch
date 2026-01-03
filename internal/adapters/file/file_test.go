@@ -65,7 +65,7 @@ func TestFileAdapter_Apply_Backup(t *testing.T) {
 		t.Errorf("Backup source mismatch. Got %s, want %s", mockBM.LastCreateBackupSrc, targetFile)
 	}
 
-	if res.Status != "changed" {
+	if !res.Changed {
 		t.Error("Expected status changed")
 	}
 }
@@ -75,7 +75,13 @@ func TestFileAdapter_RevertAction(t *testing.T) {
 	ctx := core.NewSystemContext(false, nil)
 	ctx.BackupManager = mockBM
 
-	adapter := NewFileAdapter("/tmp/test.txt", nil)
+	// Init Adapter
+	res := NewFileAdapter("/tmp/test.txt", nil)
+	// Cast to concrete type to access struct fields for testing
+	adapter, ok := res.(*FileAdapter)
+	if !ok {
+		t.Fatal("Failed to cast resource to *FileAdapter")
+	}
 	adapter.BackupPath = "/backup/path/hash"
 
 	// Test Reverting a Modification (which uses backup)
@@ -97,7 +103,11 @@ func TestFileAdapter_RevertAction(t *testing.T) {
 	// Since adapter uses os.Remove directly, integration style is easier.
 	tmpFile := "/tmp/veto_test_delete_me.txt"
 	os.WriteFile(tmpFile, []byte("content"), 0644)
-	adapter2 := NewFileAdapter(tmpFile, nil)
+	res2 := NewFileAdapter(tmpFile, nil)
+	adapter2, ok := res2.(*FileAdapter)
+	if !ok {
+		t.Fatal("Failed to cast resource to *FileAdapter")
+	}
 
 	err = adapter2.RevertAction("created", ctx)
 	if err != nil {

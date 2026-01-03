@@ -8,6 +8,7 @@ import (
 	"github.com/joho/godotenv"
 	"gopkg.in/yaml.v3"
 
+	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/crypto"
 	"github.com/melih-ucgun/veto/internal/system"
@@ -398,10 +399,8 @@ func getMasterKey() string {
 		return key
 	}
 
-	// 2. File (~/.veto/master.key)
-	home, err := os.UserHomeDir()
-	if err == nil {
-		keyPath := filepath.Join(home, ".veto", "master.key")
+	// 2. File
+	if keyPath, err := consts.GetMasterKeyPath(); err == nil {
 		if content, err := os.ReadFile(keyPath); err == nil {
 			return string(content)
 		}

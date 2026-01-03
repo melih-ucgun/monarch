@@ -6,7 +6,6 @@ import (
 	"sync"
 	"text/tabwriter"
 
-	"github.com/melih-ucgun/veto/internal/config"
 	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/inventory"
 	"github.com/melih-ucgun/veto/internal/system"
@@ -60,9 +59,9 @@ var factsCmd = &cobra.Command{
 			go func(h inventory.Host) {
 				defer wg.Done()
 
-				// Map inventory.Host to config.Host for Transport
+				// Map inventory.Host to transport.HostConfig for Transport
 				// TODO: Load vars for Become info if needed
-				cfgHost := config.Host{
+				cfgHost := transport.HostConfig{
 					Name:         h.Name,
 					Address:      h.Address,
 					User:         h.User,

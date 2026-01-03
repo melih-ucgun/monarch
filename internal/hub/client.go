@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/pterm/pterm"
 )
 
@@ -20,15 +21,14 @@ type HubClient struct {
 // NewHubClient creates a new client pointing to the official recipe repo
 func NewHubClient(localPath string) *HubClient {
 	if localPath == "" {
-		home, _ := os.UserHomeDir()
-		localPath = filepath.Join(home, ".veto", "hub", "index")
+		localPath, _ = consts.GetHubIndexPath()
 	}
 	return &HubClient{
 		// Defaults to a placeholder generic repo or official one if it existed.
 		// For now, we can allow overriding or default to a safe example.
 		// Since this is a "Project Agnostic" tool, maybe valid to keep it configurable?
 		// Setting a default placeholders.
-		RegistryURL: "https://github.com/melih-ucgun/veto-recipes.git",
+		RegistryURL: consts.DefaultHubRepo,
 		LocalPath:   localPath,
 	}
 }
@@ -79,7 +79,7 @@ func (c *HubClient) Search(query string) ([]string, error) {
 		}
 
 		// Look for system.yaml to identify a valid recipe
-		if !d.IsDir() && d.Name() == "system.yaml" {
+		if !d.IsDir() && d.Name() == consts.SystemProfileName {
 			// Get relative path from hub root
 			relPath, _ := filepath.Rel(c.LocalPath, filepath.Dir(path))
 

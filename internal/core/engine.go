@@ -9,13 +9,14 @@ import (
 	"github.com/pterm/pterm"
 
 	"github.com/melih-ucgun/veto/internal/state"
+	"github.com/melih-ucgun/veto/internal/types"
 )
 
 // StateUpdater interface allows Engine to be independent of the state package.
 // StateUpdater interface allows Engine to be independent of the state package.
 type StateUpdater interface {
 	UpdateResource(resType, name, targetState, status string) error
-	AddTransaction(tx state.Transaction) error
+	AddTransaction(tx types.Transaction) error
 }
 
 // ConfigItem is the raw configuration part that the engine will process.
@@ -61,11 +62,11 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 	errCount := 0
 
 	// Transaction recording
-	transaction := state.Transaction{
+	transaction := types.Transaction{
 		ID:        uuid.New().String(),
 		Timestamp: time.Now(),
 		Status:    "success",
-		Changes:   []state.TransactionChange{},
+		Changes:   []types.TransactionChange{},
 	}
 
 	// Initialize Backup Manager for this transaction
@@ -109,7 +110,7 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 			fmt.Printf("✅ [%s] %s\n", item.Name, result.Message)
 
 			// Record change for History
-			change := state.TransactionChange{
+			change := types.TransactionChange{
 				Type:   item.Type,
 				Name:   item.Name,
 				Action: "applied",
@@ -176,11 +177,11 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 	var mu sync.Mutex               // lock for updatedResources
 
 	// Transaction recording
-	transaction := state.Transaction{
+	transaction := types.Transaction{
 		ID:        uuid.New().String(),
 		Timestamp: time.Now(),
 		Status:    "success",
-		Changes:   []state.TransactionChange{},
+		Changes:   []types.TransactionChange{},
 	}
 	var txMu sync.Mutex
 
@@ -294,7 +295,7 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 				}
 
 				// Record change for History
-				change := state.TransactionChange{
+				change := types.TransactionChange{
 					Type:   it.Type,
 					Name:   it.Name,
 					Action: "applied",

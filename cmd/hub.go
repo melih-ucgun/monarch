@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/melih-ucgun/veto/internal/hub"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -68,8 +69,7 @@ var hubInstallCmd = &cobra.Command{
 		}
 
 		// Determine target directory
-		home, _ := os.UserHomeDir()
-		recipesDir := filepath.Join(home, ".veto", "recipes")
+		recipesDir, _ := consts.GetRecipesPath()
 		targetDir := filepath.Join(recipesDir, targetName)
 
 		pterm.Info.Printf("Installing '%s' to '%s'...\n", recipeName, targetName)
