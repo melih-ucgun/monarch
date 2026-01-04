@@ -91,3 +91,21 @@ func (r *AptAdapter) RevertAction(action string, ctx *core.SystemContext) error 
 	}
 	return nil
 }
+
+func (r *AptAdapter) ListInstalled(ctx *core.SystemContext) ([]string, error) {
+	// apt-mark showmanual: lists explicitly installed packages
+	output, err := runCommand(ctx, "apt-mark", "showmanual")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list manual packages: %w", err)
+	}
+	return splitLines(output), nil
+}
+
+func (r *AptAdapter) RemoveBatch(names []string, ctx *core.SystemContext) error {
+	if len(names) == 0 {
+		return nil
+	}
+	args := append([]string{"remove", "-y"}, names...)
+	_, err := runCommand(ctx, "apt-get", args...)
+	return err
+}

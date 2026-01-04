@@ -28,6 +28,7 @@ type SSHTransport struct {
 	sftpClient *sftp.Client
 	sftpFS     *SFTPFS
 	config     HostConfig
+	Logger     core.Logger
 }
 
 func NewSSHTransport(ctx context.Context, host HostConfig) (*SSHTransport, error) {
@@ -88,6 +89,9 @@ func (t *SSHTransport) Close() error {
 
 // Execute runs a command and returns its combined output.
 func (t *SSHTransport) Execute(ctx context.Context, cmd string) (string, error) {
+	if t.Logger != nil {
+		t.Logger.Trace("Executing remote command", "host", t.config.Name, "command", cmd)
+	}
 	session, err := t.client.NewSession()
 	if err != nil {
 		return "", err

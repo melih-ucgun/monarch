@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -27,6 +28,7 @@ type ConfigItem struct {
 	When   string // Condition to evaluate
 	Params map[string]interface{}
 	Hooks  Hooks
+	Prune  bool `yaml:"prune"`
 }
 
 // Hooks defines lifecycle hooks for a resource execution.
@@ -82,6 +84,7 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 			item.Params = make(map[string]interface{})
 		}
 		item.Params["state"] = item.State
+		item.Params["prune"] = item.Prune
 
 		// 1. Create resource
 		res, err := createFn(item.Type, item.Name, item.Params, e.Context)
@@ -93,7 +96,7 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 
 		// 1.5 Validate resource configuration
 		if err := res.Validate(e.Context); err != nil {
-			pterm.Error.Printf("[%s] Validation Failed: %v\n", item.Name, err)
+			e.Context.Logger.Error(fmt.Sprintf("[%s] Validation Failed: %v", item.Name, err))
 			errCount++
 			continue
 		}
@@ -105,9 +108,9 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 		if err != nil {
 			status = "failed"
 			errCount++
-			fmt.Printf("❌ [%s] Failed: %v\n", item.Name, err)
+			e.Context.Logger.Error(fmt.Sprintf("[%s] Failed: %v", item.Name, err))
 		} else if result.Changed {
-			fmt.Printf("✅ [%s] %s\n", item.Name, result.Message)
+			e.Context.Logger.Info(fmt.Sprintf("[%s] %s", item.Name, result.Message))
 
 			// Record change for History
 			change := types.TransactionChange{
@@ -139,7 +142,7 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 			if result.Message != "" {
 				msg = result.Message
 			}
-			pterm.Info.Printf("[%s] %s: %s\n", item.Type, item.Name, msg)
+			e.Context.Logger.Debug(fmt.Sprintf("[%s] %s: %s", item.Type, item.Name, msg))
 		}
 
 		// 3. Save State (If not DryRun)
@@ -199,6 +202,7 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 				it.Params = make(map[string]interface{})
 			}
 			it.Params["state"] = it.State
+			it.Params["prune"] = it.Prune
 
 			// 0. Check Condition (When)
 			if it.When != "" {
@@ -209,15 +213,14 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 					return
 				}
 				if !shouldRun {
-					// pterm.Gray is a color, to print we need to creating a style or use Printf from a style
-					pterm.NewStyle(pterm.FgGray).Printf("⚪ [%s] Skipped (Condition not met: %s)\n", it.Name, it.When)
+					e.Context.Logger.Debug(fmt.Sprintf("[%s] Skipped (Condition not met: %s)", it.Name, it.When))
 					return
 				}
 			}
 
 			// 0.5 Render Templates in Params
 			if err := renderParams(it.Params, e.Context); err != nil {
-				pterm.Error.Printf("[%s] Template Error: %v\n", it.Name, err)
+				e.Context.Logger.Error(fmt.Sprintf("[%s] Template Error: %v", it.Name, err))
 				errChan <- err
 				return
 			}
@@ -232,7 +235,7 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 
 			// 1.5 Validate resource configuration
 			if err := res.Validate(e.Context); err != nil {
-				pterm.Error.Printf("[%s] Validation Failed: %v\n", it.Name, err)
+				e.Context.Logger.Error(fmt.Sprintf("[%s] Validation Failed: %v", it.Name, err))
 				errChan <- err
 				return
 			}
@@ -240,11 +243,11 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 			// 1.9 PRE-HOOK
 			if it.Hooks.Pre != "" {
 				if err := executeHook(e.Context, it.Hooks.Pre); err != nil {
-					pterm.Error.Printf("[%s] Pre-Hook Failed: %v. Skipping resource.\n", it.Name, err)
+					e.Context.Logger.Error(fmt.Sprintf("[%s] Pre-Hook Failed: %v. Skipping resource.", it.Name, err))
 					errChan <- err
 					return
 				}
-				pterm.Debug.Printf("[%s] Pre-Hook executed\n", it.Name)
+				e.Context.Logger.Debug(fmt.Sprintf("[%s] Pre-Hook executed", it.Name))
 			}
 
 			// 2. Apply resource
@@ -255,9 +258,9 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 				// We log warnings but don't fail the whole resource if Post hook fails?
 				// Plan said: "If ... post ... hooks fail, we log a WARNING, but the main resource status remains"
 				if hookErr := executeHook(e.Context, it.Hooks.Post); hookErr != nil {
-					pterm.Warning.Printf("[%s] Post-Hook Failed: %v\n", it.Name, hookErr)
+					e.Context.Logger.Warn(fmt.Sprintf("[%s] Post-Hook Failed: %v", it.Name, hookErr))
 				} else {
-					pterm.Debug.Printf("[%s] Post-Hook executed\n", it.Name)
+					e.Context.Logger.Debug(fmt.Sprintf("[%s] Post-Hook executed", it.Name))
 				}
 			}
 
@@ -266,24 +269,24 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 			if err != nil {
 				status = "failed"
 				errChan <- err
-				pterm.Error.Printf("[%s] %s: Failed: %v\n", it.Type, it.Name, err)
+				e.Context.Logger.Error(fmt.Sprintf("[%s] %s: Failed: %v", it.Type, it.Name, err))
 
 				// 2.2 ON-FAIL HOOK
 				if it.Hooks.OnFail != "" {
 					if hookErr := executeHook(e.Context, it.Hooks.OnFail); hookErr != nil {
-						pterm.Warning.Printf("[%s] On-Fail Hook Failed: %v\n", it.Name, hookErr)
+						e.Context.Logger.Warn(fmt.Sprintf("[%s] On-Fail Hook Failed: %v", it.Name, hookErr))
 					}
 				}
 			} else if result.Changed {
 				// Success
-				pterm.Success.Printf("[%s] %s: %s\n", it.Type, it.Name, result.Message)
+				e.Context.Logger.Info(fmt.Sprintf("[%s] %s: %s", it.Type, it.Name, result.Message))
 
 				// 2.3 ON-CHANGE HOOK
 				if it.Hooks.OnChange != "" {
 					if hookErr := executeHook(e.Context, it.Hooks.OnChange); hookErr != nil {
-						pterm.Warning.Printf("[%s] On-Change Hook Failed: %v\n", it.Name, hookErr)
+						e.Context.Logger.Warn(fmt.Sprintf("[%s] On-Change Hook Failed: %v", it.Name, hookErr))
 					} else {
-						pterm.Success.Printf("   └── Hook: %s\n", it.Hooks.OnChange)
+						e.Context.Logger.Info(fmt.Sprintf("   └── Hook: %s", it.Hooks.OnChange))
 					}
 				}
 
@@ -327,7 +330,7 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 				if result.Message != "" {
 					msg = result.Message
 				}
-				pterm.Info.Printf("[%s] %s: %s\n", it.Type, it.Name, msg)
+				e.Context.Logger.Debug(fmt.Sprintf("[%s] %s: %s", it.Type, it.Name, msg))
 			}
 
 			// 3. Save State
@@ -538,9 +541,6 @@ func renderParams(params map[string]interface{}, ctx *SystemContext) error {
 // Prune identifies unmanaged resources and removes them upon confirmation.
 // Supports any resource type that implements the Lister interface.
 func (e *Engine) Prune(configItems []ConfigItem, createFn ResourceCreator) error {
-	// 1. Identify Resource Types present in config or supported for pruning
-	targetTypes := []string{"pkg", "service"}
-
 	pterm.Println()
 	pterm.DefaultHeader.WithFullWidth().
 		WithBackgroundStyle(pterm.NewStyle(pterm.BgRed)).
@@ -555,62 +555,106 @@ func (e *Engine) Prune(configItems []ConfigItem, createFn ResourceCreator) error
 	}
 	var tasks []PruneTask
 
-	for _, resType := range targetTypes {
-		// Collect Managed Resources for this type
+	// 1. GLOBAL PRUNING (Packages, Services)
+	// These types are managed globally: anything installed but not in config is unmanaged.
+	globalTypes := []string{"package", "service"}
+
+	for _, resType := range globalTypes {
 		managed := make(map[string]bool)
 		for _, item := range configItems {
-			if item.Type == resType {
+			// Check for both the generic 'package' type and provider-specific names (pacman, apt, etc.)
+			if item.Type == resType || (resType == "package" && (item.Type == "pkg" || item.Type == "pacman" || item.Type == "apt" || item.Type == "dnf" || item.Type == "brew" || item.Type == "apk" || item.Type == "zypper" || item.Type == "yum")) {
 				managed[item.Name] = true
 			}
 		}
 
-		// Create dummy adapter for listing
-		// Use a fixed name "prune_helper" to get an instance
+		// Create dummy instance to get the appropriate Lister for the current OS
 		dummyRes, err := createFn(resType, "prune_helper", nil, e.Context)
 		if err != nil {
-			// Resource type might not be registered or supported on this OS
 			continue
 		}
 
 		lister, ok := dummyRes.(Lister)
 		if !ok {
-			// Type does not support listing, skip
 			continue
 		}
 
-		// List Installed
-		pterm.Info.Printf("Analyzing %s resources...\n", resType)
+		e.Context.Logger.Info(fmt.Sprintf("Analyzing global %s resources...", resType))
 		installed, err := lister.ListInstalled(e.Context)
 		if err != nil {
-			pterm.Warning.Printf("Failed to list installed %s: %v\n", resType, err)
+			e.Context.Logger.Warn(fmt.Sprintf("Failed to list installed %s: %v", resType, err))
 			continue
 		}
 
-		// Calculate Diff
 		var unmanaged []string
 		for _, name := range installed {
 			if !managed[name] {
+				// Safety: Skip core system packages if needed (optional implementation plan detail)
 				unmanaged = append(unmanaged, name)
 			}
 		}
 
 		if len(unmanaged) > 0 {
-			tasks = append(tasks, PruneTask{
-				Type:      resType,
-				Resources: unmanaged,
-				Adapter:   lister,
-			})
+			tasks = append(tasks, PruneTask{Type: resType, Resources: unmanaged, Adapter: lister})
 			totalUnmanaged += len(unmanaged)
+			e.Context.Logger.Warn("Found unmanaged resources", "count", len(unmanaged), "type", resType)
+		}
+	}
 
-			pterm.Error.Printf("Found %d unmanaged %s resources:\n", len(unmanaged), resType)
-			for i, name := range unmanaged {
-				if i < 5 {
-					fmt.Printf(" - %s\n", name)
-				} else {
-					fmt.Printf(" ... and %d more\n", len(unmanaged)-5)
-					break
+	// 2. SCOPED PRUNING (Files in specific directories)
+	// These are only pruned if explicitly marked with prune: true in config.
+	for _, item := range configItems {
+		if !item.Prune {
+			continue
+		}
+
+		// Currently only file supports scoped pruning
+		if item.Type != "file" {
+			continue
+		}
+
+		res, err := createFn(item.Type, item.Name, item.Params, e.Context)
+		if err != nil {
+			continue
+		}
+
+		lister, ok := res.(Lister)
+		if !ok {
+			continue
+		}
+
+		e.Context.Logger.Info(fmt.Sprintf("Analyzing scoped %s: %s", item.Type, item.Name))
+		installed, err := lister.ListInstalled(e.Context)
+		if err != nil {
+			e.Context.Logger.Warn(fmt.Sprintf("Failed to list scoped %s: %v", item.Name, err))
+			continue
+		}
+
+		// For scoped pruning, "managed" are all file resources THAT FALL UNDER THIS SCOPE.
+		// Since we handle file resources individually, we need to check if they point to paths
+		// inside this directory.
+		managedPaths := make(map[string]bool)
+		for _, otherItem := range configItems {
+			if otherItem.Type == "file" {
+				path, _ := otherItem.Params["path"].(string)
+				if path == "" {
+					path = otherItem.Name
 				}
+				managedPaths[filepath.Clean(path)] = true
 			}
+		}
+
+		var unmanaged []string
+		for _, path := range installed {
+			if !managedPaths[filepath.Clean(path)] {
+				unmanaged = append(unmanaged, path)
+			}
+		}
+
+		if len(unmanaged) > 0 {
+			tasks = append(tasks, PruneTask{Type: item.Type, Resources: unmanaged, Adapter: lister})
+			totalUnmanaged += len(unmanaged)
+			e.Context.Logger.Warn("Found unmanaged files in scoped directory", "count", len(unmanaged), "path", item.Name)
 		}
 	}
 
@@ -619,85 +663,81 @@ func (e *Engine) Prune(configItems []ConfigItem, createFn ResourceCreator) error
 		return nil
 	}
 
-	// Double Confirmation
+	// Preview & Confirmation
 	pterm.Println()
-	result, _ := pterm.DefaultInteractiveConfirm.
-		WithDefaultText(fmt.Sprintf("Are you sure you want to delete/disable these %d resources?", totalUnmanaged)).
+	pterm.Warning.Printf("Total unmanaged resources found: %d\n", totalUnmanaged)
+	for _, task := range tasks {
+		pterm.Info.Printf("Type [%s]: %d items\n", task.Type, len(task.Resources))
+		for i, name := range task.Resources {
+			if i < 3 {
+				fmt.Printf(" - %s\n", name)
+			} else if i == 3 {
+				fmt.Printf(" ... and %d more\n", len(task.Resources)-3)
+				break
+			}
+		}
+	}
+
+	pterm.Println()
+	confirm, _ := pterm.DefaultInteractiveConfirm.
+		WithDefaultText("Do you want to proceed with pruning?").
 		WithDefaultValue(false).
 		Show()
 
-	if !result {
+	if !confirm {
 		pterm.Info.Println("Prune cancelled.")
 		return nil
 	}
 
-	pterm.Println()
-	pterm.Warning.Println("This operation is DESTRUCTIVE.")
-	input, _ := pterm.DefaultInteractiveTextInput.
-		WithDefaultText("Type 'confirm prune' to proceed").
-		Show()
-
-	if input != "confirm prune" {
-		pterm.Error.Println("Confirmation failed. Aborting.")
-		return nil
-	}
-
 	// Execution
-	pterm.Println()
-	pterm.Info.Println("Starting cleanup...")
-
 	for _, task := range tasks {
-		// Check for BatchRemover support
-		if batchRemover, ok := task.Adapter.(BatchRemover); ok {
-			pterm.Info.Printf("Batch pruning %d %s resources...\n", len(task.Resources), task.Type)
+		if batchRemover, ok := task.Adapter.(BatchRemover); ok && task.Type != "file" {
+			e.Context.Logger.Info("Batch pruning %d %s resources...", len(task.Resources), task.Type)
 			if err := batchRemover.RemoveBatch(task.Resources, e.Context); err != nil {
-				pterm.Error.Printf("Batch removal failed: %v. Falling back to individual removal.\n", err)
+				e.Context.Logger.Warn("Batch removal failed: %v. Falling back to individual removal.", err)
 			} else {
-				pterm.Success.Printf("Batch pruning completed for %s\n", task.Type)
 				continue
 			}
 		}
 
-		// Individual Removal (Fallback or Default)
 		for _, name := range task.Resources {
-			pterm.Printf("Pruning [%s] %s... ", task.Type, name)
+			e.Context.Logger.Info("Pruning [%s] %s", task.Type, name)
+			if e.Context.DryRun {
+				continue
+			}
 
-			// Create resource with state=absent (for pkg) or appropriate state for services
 			params := make(map[string]interface{})
 			if task.Type == "service" {
 				params["enabled"] = false
 				params["state"] = "stopped"
+			} else if task.Type == "file" {
+				params["state"] = "absent"
+				params["path"] = name
 			} else {
 				params["state"] = "absent"
 			}
 
 			res, err := createFn(task.Type, name, params, e.Context)
 			if err != nil {
-				pterm.Error.Printf("Failed to create resource handle: %v\n", err)
-				continue
-			}
-
-			if e.Context.DryRun {
-				pterm.Success.Println("[DryRun] Pruned")
+				e.Context.Logger.Error("Failed to create prune handle for %s: %v", name, err)
 				continue
 			}
 
 			_, err = res.Apply(e.Context)
 			if err != nil {
-				pterm.Error.Printf("Failed: %v\n", err)
-			} else {
-				pterm.Success.Println("Pruned")
+				e.Context.Logger.Error("Failed to prune %s: %v", name, err)
 			}
 		}
 	}
 
+	pterm.Success.Println("Prune completed successfully.")
 	return nil
 }
 
 // executeHook executes a shell command using the context's transport.
 func executeHook(ctx *SystemContext, cmd string) error {
 	if ctx.DryRun {
-		pterm.Info.Printf("[DryRun] Would execute hook: %s\n", cmd)
+		ctx.Logger.Info(fmt.Sprintf("[DryRun] Would execute hook: %s", cmd))
 		return nil
 	}
 	// Use Transport to execute

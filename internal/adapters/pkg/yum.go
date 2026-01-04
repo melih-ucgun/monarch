@@ -67,3 +67,20 @@ func (r *YumAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 
 	return core.SuccessChange(fmt.Sprintf("Yum processed %s", r.Name)), nil
 }
+
+func (r *YumAdapter) ListInstalled(ctx *core.SystemContext) ([]string, error) {
+	output, err := runCommand(ctx, "rpm", "-qa", "--qf", "%{NAME}\n")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list installed packages: %w", err)
+	}
+	return splitLines(output), nil
+}
+
+func (r *YumAdapter) RemoveBatch(names []string, ctx *core.SystemContext) error {
+	if len(names) == 0 {
+		return nil
+	}
+	args := append([]string{"remove", "-y"}, names...)
+	_, err := runCommand(ctx, "yum", args...)
+	return err
+}

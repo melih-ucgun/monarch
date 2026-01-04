@@ -85,3 +85,21 @@ func (r *DnfAdapter) Revert(ctx *core.SystemContext) error {
 	}
 	return nil
 }
+
+func (r *DnfAdapter) ListInstalled(ctx *core.SystemContext) ([]string, error) {
+	// rpm -qa --qf "%{NAME}\n" lists all installed package names
+	output, err := runCommand(ctx, "rpm", "-qa", "--qf", "%{NAME}\n")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list installed packages: %w", err)
+	}
+	return splitLines(output), nil
+}
+
+func (r *DnfAdapter) RemoveBatch(names []string, ctx *core.SystemContext) error {
+	if len(names) == 0 {
+		return nil
+	}
+	args := append([]string{"remove", "-y"}, names...)
+	_, err := runCommand(ctx, "dnf", args...)
+	return err
+}

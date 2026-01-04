@@ -71,3 +71,13 @@ func runCommand(ctx *core.SystemContext, name string, args ...string) (string, e
 	}
 	return ctx.Transport.Execute(ctx.Context, fullCmd)
 }
+
+func splitLines(s string) []string {
+	var lines []string
+	for _, line := range strings.Split(s, "\n") {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			lines = append(lines, trimmed)
+		}
+	}
+	return lines
+}

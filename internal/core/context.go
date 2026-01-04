@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"io"
 	"os"
 )
 
@@ -49,9 +48,8 @@ type SystemContext struct {
 	// Vars holds arbitrary variables (host vars, facts, etc.)
 	Vars map[string]string `yaml:"vars,omitempty"`
 
-	// Logger veya Output (İleride loglama için)
-	Stdout io.Writer `yaml:"-"`
-	Stderr io.Writer `yaml:"-"`
+	// Logger (Yeni loglama sistemi)
+	Logger Logger `yaml:"-"`
 
 	// Transaction Context
 	TxID          string      `yaml:"-"`
@@ -93,10 +91,9 @@ func NewSystemContext(dryRun bool, tr Transport) *SystemContext {
 		User:       os.Getenv("USER"),
 		HomeDir:    os.Getenv("HOME"),
 		DryRun:     dryRun,
-		Stdout:     os.Stdout,
-		Stderr:     os.Stderr,
 		FS:         &RealFS{}, // Default to local filesystem
 		Transport:  tr,
+		Logger:     NewDefaultLogger(os.Stderr, LevelInfo),
 		// Diğer alt structlar zero-value olarak başlar, detector tarafından doldurulur.
 	}
 }

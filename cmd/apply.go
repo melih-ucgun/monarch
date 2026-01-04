@@ -84,6 +84,20 @@ func runApply(configFile, invFile string, concurrency int, isDryRun bool, skipSn
 	// 1. Detect System (Local Context for Info/Snapshots)
 	localTransport := transport.NewLocalTransport()
 	ctx := core.NewSystemContext(isDryRun, localTransport)
+
+	// Set Logger Level
+	logLevel := core.LevelInfo
+	switch verboseCount {
+	case 1:
+		logLevel = core.LevelInfo
+	case 2:
+		logLevel = core.LevelDebug
+	case 3:
+		logLevel = core.LevelTrace
+	}
+	ctx.Logger.SetLevel(logLevel)
+	localTransport.Logger = ctx.Logger
+
 	system.Detect(ctx)
 
 	// 1.5 Load System Profile (if exists)
@@ -198,6 +212,7 @@ func runApply(configFile, invFile string, concurrency int, isDryRun bool, skipSn
 					OnChange: res.Hooks.OnChange,
 					OnFail:   res.Hooks.OnFail,
 				},
+				Prune: res.Prune,
 			})
 		}
 		layers = append(layers, layerItems)
@@ -221,7 +236,7 @@ func runApply(configFile, invFile string, concurrency int, isDryRun bool, skipSn
 			return fmt.Errorf("failed to load inventory: %w", err)
 		}
 
-		fleetMgr := fleet.NewFleetManager(inv.Hosts, isDryRun, isPrune)
+		fleetMgr := fleet.NewFleetManager(inv.Hosts, isDryRun, isPrune, ctx.Logger)
 		if err := fleetMgr.ApplyConfig(layers, concurrency, createFn); err != nil {
 			return err
 		}
@@ -284,8 +299,10 @@ func runApply(configFile, invFile string, concurrency int, isDryRun bool, skipSn
 		var allItems []core.ConfigItem
 		for _, res := range cfg.Resources {
 			allItems = append(allItems, core.ConfigItem{
-				Name: res.Name,
-				Type: res.Type,
+				Name:   res.Name,
+				Type:   res.Type,
+				Prune:  res.Prune,
+				Params: res.Params,
 			})
 		}
 

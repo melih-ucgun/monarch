@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/melih-ucgun/veto/internal/core"
-	"github.com/pterm/pterm"
 )
 
 func init() {
@@ -25,6 +24,7 @@ type FileAdapter struct {
 	Mode       os.FileMode
 	State      string // present, absent
 	BackupPath string // Yedeklenen dosyanın yolu
+	Prune      bool   // Dizin için: konfikte olmayan dosyaları sil
 }
 
 func (r *FileAdapter) GetBackupPath() string {
@@ -56,6 +56,7 @@ func NewFileAdapter(name string, params map[string]interface{}) core.Resource {
 	}
 
 	backupPath, _ := params["backup_path"].(string)
+	prune, _ := params["prune"].(bool)
 
 	return &FileAdapter{
 		BaseResource: core.BaseResource{Name: name, Type: "file"},
@@ -66,6 +67,7 @@ func NewFileAdapter(name string, params map[string]interface{}) core.Resource {
 		Mode:         mode,
 		State:        state,
 		BackupPath:   backupPath,
+		Prune:        prune,
 	}
 }
 
@@ -74,7 +76,7 @@ func (r *FileAdapter) RevertAction(action string, ctx *core.SystemContext) error
 	// For files, "applied" usually means created or modified.
 	// If we have a backup, restore it.
 	if r.BackupPath != "" {
-		pterm.Info.Printf("Restoring backup from %s to %s\n", r.BackupPath, r.Path)
+		ctx.Logger.Info("Restoring backup from %s to %s", r.BackupPath, r.Path)
 		if ctx.BackupManager != nil {
 			// Try to cast to an interface that supports RestoreBackup or specific implementation
 			// Since generic BackupManager interface in core might not have RestoreBackup?
@@ -107,12 +109,12 @@ func (r *FileAdapter) RevertAction(action string, ctx *core.SystemContext) error
 	// Safe bet: Only restore if backup exists. Or if we explicitely know it was "created".
 	// For now, rely on backup.
 	if action == "applied" && r.BackupPath == "" {
-		pterm.Warning.Printf("No backup found for %s. Skipping rollback of modification.\n", r.Path)
+		ctx.Logger.Warn("No backup found for %s. Skipping rollback of modification.", r.Path)
 		return nil
 	}
 
 	if action == "created" {
-		pterm.Info.Printf("Reverting creation of %s (deleting)\n", r.Path)
+		ctx.Logger.Info("Reverting creation of %s (deleting)", r.Path)
 		return ctx.FS.Remove(r.Path)
 	}
 
@@ -129,8 +131,8 @@ func (r *FileAdapter) Validate(ctx *core.SystemContext) error {
 	}
 
 	if r.State == "present" {
-		if r.Source == "" && r.Content == "" {
-			return fmt.Errorf("either 'source' or 'content' must be provided for file resource when state is 'present'")
+		if r.Source == "" && r.Content == "" && !r.Prune {
+			return fmt.Errorf("either 'source' or 'content' must be provided for file resource when state is 'present' (unless prune is true)")
 		}
 		if r.Source != "" && r.Content != "" {
 			return fmt.Errorf("cannot provide both 'source' and 'content' for file resource")
@@ -259,9 +261,11 @@ func (r *FileAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 
 	// YEDEKLEME
 	if ctx.BackupManager != nil && ctx.TxID != "" {
+		ctx.Logger.Debug("[%s] Creating backup of %s", r.Name, r.Path)
 		backupPath, err := ctx.BackupManager.CreateBackup(ctx.TxID, r.Path)
 		if err == nil {
 			r.BackupPath = backupPath
+			ctx.Logger.Trace("[%s] Backup created at %s", r.Name, backupPath)
 		} else {
 			return core.Failure(err, "Failed to backup file"), err
 		}
@@ -348,4 +352,40 @@ func (r *FileAdapter) compareFiles(ctx *core.SystemContext, src, dst string) (bo
 		return false, err
 	}
 	return string(s) == string(d), nil
+}
+
+// ListInstalled satisfies the core.Lister interface.
+// For files, this is only meaningful if the resource points to a directory and has Prune: true.
+func (r *FileAdapter) ListInstalled(ctx *core.SystemContext) ([]string, error) {
+	if !r.Prune {
+		return nil, nil
+	}
+
+	info, err := ctx.FS.Stat(r.Path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if !info.IsDir() {
+		// If it's a single file, we don't "list" it for pruning in the traditional sense
+		// unless we want to support "ensure this exact file is the ONLY one"?
+		// No, scoped pruning is for directories.
+		return nil, nil
+	}
+
+	// List files in directory
+	entries, err := ctx.FS.ReadDir(r.Path)
+	if err != nil {
+		return nil, err
+	}
+
+	var files []string
+	for _, entry := range entries {
+		files = append(files, filepath.Join(r.Path, entry.Name()))
+	}
+
+	return files, nil
 }

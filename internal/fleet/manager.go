@@ -19,14 +19,16 @@ type FleetManager struct {
 	DiffMode bool // For Plan mode
 	DryRun   bool
 	Prune    bool
+	Logger   core.Logger
 }
 
 // NewFleetManager creates a new FleetManager.
-func NewFleetManager(hosts []inventory.Host, dryRun bool, prune bool) *FleetManager {
+func NewFleetManager(hosts []inventory.Host, dryRun bool, prune bool, logger core.Logger) *FleetManager {
 	return &FleetManager{
 		Hosts:  hosts,
 		DryRun: dryRun,
 		Prune:  prune,
+		Logger: logger,
 	}
 }
 
@@ -46,8 +48,9 @@ func (f *FleetManager) ApplyConfig(layers [][]core.ConfigItem, concurrency int, 
 			sem <- struct{}{}        // Acquire
 			defer func() { <-sem }() // Release
 
-			prefix := pterm.NewStyle(pterm.FgCyan, pterm.Bold).Sprintf("[%s] ", h.Name)
-			pterm.Println(prefix + "Connecting...")
+			// Initialize Scoped Logger for this host
+			hostLogger := f.Logger.With("host", h.Name)
+			hostLogger.Info("Connecting to host")
 
 			// 1. Initialize Transport
 			var trans core.Transport
@@ -75,7 +78,7 @@ func (f *FleetManager) ApplyConfig(layers [][]core.ConfigItem, concurrency int, 
 
 				trans, err = transport.NewSSHTransport(ctx, sshConfig)
 				if err != nil {
-					pterm.Error.Println(prefix + "Connection Failed: " + err.Error())
+					hostLogger.Error("Connection Failed: %v", err)
 					errChan <- fmt.Errorf("[%s] connection failed: %w", h.Name, err)
 					return
 				}
@@ -89,11 +92,12 @@ func (f *FleetManager) ApplyConfig(layers [][]core.ConfigItem, concurrency int, 
 				FS:         trans.GetFileSystem(),
 				DryRun:     f.DryRun,
 				TargetUser: h.User,
+				Logger:     hostLogger,
 			}
 
 			// 3. Detect System
 			system.Detect(sysCtx)
-			pterm.Println(prefix + fmt.Sprintf("OS: %s / %s", sysCtx.Distro, sysCtx.Version))
+			hostLogger.Info("System detected: %s %s", sysCtx.Distro, sysCtx.Version)
 
 			// 4. Create Engine
 			engine := core.NewEngine(sysCtx, nil) // State updater per host TODO
@@ -124,13 +128,13 @@ func (f *FleetManager) ApplyConfig(layers [][]core.ConfigItem, concurrency int, 
 
 				// Reuse Engine.RunParallel logic
 				if err := engine.RunParallel(hostLayer, createFn); err != nil {
-					pterm.Error.Printf("%s Layer %d Failed: %v\n", prefix, i+1, err)
+					hostLogger.Error("Layer %d Failed: %v", i+1, err)
 					errChan <- fmt.Errorf("[%s] layer %d failed: %w", h.Name, i+1, err)
 					return // Stop this host
 				}
 			}
 
-			pterm.Success.Println(prefix + "Completed Successfully")
+			hostLogger.Info("Completed Successfully")
 
 		}(host)
 	}

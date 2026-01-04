@@ -132,16 +132,6 @@ func (r *PacmanAdapter) ListInstalled(ctx *core.SystemContext) ([]string, error)
 	return splitLines(output), nil
 }
 
-func splitLines(s string) []string {
-	var lines []string
-	for _, line := range strings.Split(s, "\n") {
-		if trimmed := strings.TrimSpace(line); trimmed != "" {
-			lines = append(lines, trimmed)
-		}
-	}
-	return lines
-}
-
 // RemoveBatch removes multiple packages at once.
 func (r *PacmanAdapter) RemoveBatch(names []string, ctx *core.SystemContext) error {
 	if len(names) == 0 {
@@ -149,7 +139,7 @@ func (r *PacmanAdapter) RemoveBatch(names []string, ctx *core.SystemContext) err
 	}
 
 	if ctx.DryRun {
-		fmt.Printf("[DryRun] Would remove packages: %s\n", strings.Join(names, ", "))
+		ctx.Logger.Info("[DryRun] Would remove packages: %s", strings.Join(names, ", "))
 		return nil
 	}
 

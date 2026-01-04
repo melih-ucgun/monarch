@@ -37,6 +37,7 @@ type ResourceConfig struct {
 	DependsOn []string               `yaml:"depends_on"`
 	Params    map[string]interface{} `yaml:"params"`
 	Hooks     Hooks                  `yaml:"hooks"`
+	Prune     bool                   `yaml:"prune"`
 }
 
 // Hooks defines lifecycle command hooks for a resource.

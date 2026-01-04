@@ -71,3 +71,21 @@ func (r *ZypperAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 
 	return core.SuccessChange(fmt.Sprintf("Zypper processed %s", r.Name)), nil
 }
+
+func (r *ZypperAdapter) ListInstalled(ctx *core.SystemContext) ([]string, error) {
+	// rpm -qa --qf "%{NAME}\n"
+	output, err := runCommand(ctx, "rpm", "-qa", "--qf", "%{NAME}\n")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list installed packages: %w", err)
+	}
+	return splitLines(output), nil
+}
+
+func (r *ZypperAdapter) RemoveBatch(names []string, ctx *core.SystemContext) error {
+	if len(names) == 0 {
+		return nil
+	}
+	args := append([]string{"remove", "-y"}, names...)
+	_, err := runCommand(ctx, "zypper", args...)
+	return err
+}

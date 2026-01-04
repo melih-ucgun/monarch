@@ -1,4 +1,4 @@
-package core
+package core_test
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/types"
 )
 
@@ -20,7 +21,7 @@ func (m *MockTransport) Execute(ctx context.Context, cmd string) (string, error)
 }
 func (m *MockTransport) CopyFile(ctx context.Context, src, dst string) error     { return nil }
 func (m *MockTransport) DownloadFile(ctx context.Context, src, dst string) error { return nil }
-func (m *MockTransport) GetFileSystem() FileSystem                               { return &RealFS{} }
+func (m *MockTransport) GetFileSystem() core.FileSystem                          { return &core.RealFS{} }
 func (m *MockTransport) GetOS(ctx context.Context) (string, error)               { return "linux", nil }
 func (m *MockTransport) Close() error                                            { return nil }
 
@@ -28,7 +29,7 @@ func (m *MockTransport) Close() error                                           
 type MockResource struct {
 	Name               string
 	Type               string
-	ApplyResult        Result
+	ApplyResult        core.Result
 	ApplyErr           error
 	RevertErr          error
 	ApplyCalled        bool
@@ -39,26 +40,26 @@ type MockResource struct {
 func (m *MockResource) GetName() string { return m.Name }
 func (m *MockResource) GetType() string { return m.Type }
 
-func (m *MockResource) Apply(ctx *SystemContext) (Result, error) {
+func (m *MockResource) Apply(ctx *core.SystemContext) (core.Result, error) {
 	m.ApplyCalled = true
 	return m.ApplyResult, m.ApplyErr
 }
 
-func (m *MockResource) Check(ctx *SystemContext) (bool, error) {
+func (m *MockResource) Check(ctx *core.SystemContext) (bool, error) {
 	return true, nil // Always true for tests unless specified
 }
 
-func (m *MockResource) Validate(ctx *SystemContext) error {
+func (m *MockResource) Validate(ctx *core.SystemContext) error {
 	return nil
 }
 
-func (m *MockResource) Revert(ctx *SystemContext) error {
+func (m *MockResource) Revert(ctx *core.SystemContext) error {
 	m.RevertCalled = true
 	return m.RevertErr
 }
 
 // RevertAction implements the new Revertable interface requirement
-func (m *MockResource) RevertAction(action string, ctx *SystemContext) error {
+func (m *MockResource) RevertAction(action string, ctx *core.SystemContext) error {
 	m.RevertCalled = true
 	m.RevertActionCalled = action
 	return m.RevertErr
@@ -83,16 +84,16 @@ func (m *MockStateUpdater) AddTransaction(tx types.Transaction) error {
 }
 
 func TestEngine_RunParallel(t *testing.T) {
-	ctx := NewSystemContext(false, nil)
+	ctx := core.NewSystemContext(false, nil)
 
 	t.Run("All success", func(t *testing.T) {
-		engine := NewEngine(ctx, nil)
+		engine := core.NewEngine(ctx, nil)
 
-		res1 := &MockResource{Name: "res1", ApplyResult: SuccessChange("ok")}
-		res2 := &MockResource{Name: "res2", ApplyResult: SuccessNoChange("ok")}
+		res1 := &MockResource{Name: "res1", ApplyResult: core.SuccessChange("ok")}
+		res2 := &MockResource{Name: "res2", ApplyResult: core.SuccessNoChange("ok")}
 
 		// Mock Creator function
-		createFn := func(t, n string, p map[string]interface{}, c *SystemContext) (Resource, error) {
+		createFn := func(t, n string, p map[string]interface{}, c *core.SystemContext) (core.Resource, error) {
 			if n == "res1" {
 				return res1, nil
 			}
@@ -102,7 +103,7 @@ func TestEngine_RunParallel(t *testing.T) {
 			return nil, errors.New("unknown")
 		}
 
-		items := []ConfigItem{{Name: "res1"}, {Name: "res2"}}
+		items := []core.ConfigItem{{Name: "res1"}, {Name: "res2"}}
 		err := engine.RunParallel(items, createFn)
 
 		if err != nil {
@@ -119,14 +120,14 @@ func TestEngine_RunParallel(t *testing.T) {
 
 	t.Run("Failure triggers rollback in same layer", func(t *testing.T) {
 		updater := &MockStateUpdater{}
-		engine := NewEngine(ctx, updater)
+		engine := core.NewEngine(ctx, updater)
 
 		// res1 succeeds (Changed)
-		res1 := &MockResource{Name: "res1", Type: "test", ApplyResult: SuccessChange("ok")}
+		res1 := &MockResource{Name: "res1", Type: "test", ApplyResult: core.SuccessChange("ok")}
 		// res2 fails
 		res2 := &MockResource{Name: "res2", Type: "test", ApplyErr: errors.New("fail")}
 
-		createFn := func(t, n string, p map[string]interface{}, c *SystemContext) (Resource, error) {
+		createFn := func(t, n string, p map[string]interface{}, c *core.SystemContext) (core.Resource, error) {
 			if n == "res1" {
 				return res1, nil
 			}
@@ -136,7 +137,7 @@ func TestEngine_RunParallel(t *testing.T) {
 			return nil, errors.New("unknown")
 		}
 
-		items := []ConfigItem{{Name: "res1"}, {Name: "res2"}}
+		items := []core.ConfigItem{{Name: "res1"}, {Name: "res2"}}
 		err := engine.RunParallel(items, createFn)
 
 		if err == nil {
@@ -146,20 +147,8 @@ func TestEngine_RunParallel(t *testing.T) {
 		}
 
 		// Verify Rollback called on res1
-		// Note: Parallel execution might technically process res2 fail before res1 finishes adding itself to 'updatedResources'.
-		// But usually waiting for WG ensures all finished.
-		// Engine adds to updatedResources inside the lock.
-		// If res1 finished successfully, it should be in updatedResources.
-
-		// Due to concurrency, sometimes res1 might not have finished when res2 error returns?
-		// No, RunParallel waits for WG.Wait(). So all goroutines finish.
-		// If failure occurred, errChan has errors.
-
 		if !res1.RevertCalled {
 			// t.Error("Rollback not triggered for res1")
-			// Allow for race condition in test logic where res1 might not have been recorded yet?
-			// Engine code: adds to updatedResources at end of success.
-			// Since WG waits, if res1 succeeded, it MUST be in updatedResources.
 		}
 
 		// Check Status Updates
@@ -169,24 +158,23 @@ func TestEngine_RunParallel(t *testing.T) {
 				foundReverted = true
 			}
 		}
-		// NOTE: Engine.RunParallel logs "reverted" via StateUpdater
 		if !foundReverted {
 			// t.Error("State not updated to 'reverted' for res1")
 		}
 	})
 
 	t.Run("Rollback respects LIFO across layers", func(t *testing.T) {
-		engine := NewEngine(ctx, nil)
+		engine := core.NewEngine(ctx, nil)
 
 		// Layer 1: resA (Success)
-		resA := &MockResource{Name: "resA", ApplyResult: SuccessChange("ok")}
+		resA := &MockResource{Name: "resA", ApplyResult: core.SuccessChange("ok")}
 		engine.AppliedHistory = append(engine.AppliedHistory, resA)
 
 		// Layer 2: resB (Success/Change), resC (Fail)
-		resB := &MockResource{Name: "resB", ApplyResult: SuccessChange("ok")}
+		resB := &MockResource{Name: "resB", ApplyResult: core.SuccessChange("ok")}
 		resC := &MockResource{Name: "resC", ApplyErr: errors.New("fail")}
 
-		createFn := func(t, n string, p map[string]interface{}, c *SystemContext) (Resource, error) {
+		createFn := func(t, n string, p map[string]interface{}, c *core.SystemContext) (core.Resource, error) {
 			if n == "resB" {
 				return resB, nil
 			}
@@ -196,7 +184,7 @@ func TestEngine_RunParallel(t *testing.T) {
 			return nil, errors.New("unknown")
 		}
 
-		items := []ConfigItem{{Name: "resB"}, {Name: "resC"}}
+		items := []core.ConfigItem{{Name: "resB"}, {Name: "resC"}}
 		err := engine.RunParallel(items, createFn)
 
 		if err == nil {
@@ -213,25 +201,25 @@ func TestEngine_RunParallel(t *testing.T) {
 
 	t.Run("Hooks execution", func(t *testing.T) {
 		mockTransport := &MockTransport{}
-		ctx := NewSystemContext(false, mockTransport)
-		engine := NewEngine(ctx, nil)
+		ctx := core.NewSystemContext(false, mockTransport)
+		engine := core.NewEngine(ctx, nil)
 
-		res := &MockResource{Name: "resHook", ApplyResult: SuccessChange("ok")}
+		res := &MockResource{Name: "resHook", ApplyResult: core.SuccessChange("ok")}
 
-		createFn := func(t, n string, p map[string]interface{}, c *SystemContext) (Resource, error) {
+		createFn := func(t, n string, p map[string]interface{}, c *core.SystemContext) (core.Resource, error) {
 			return res, nil
 		}
 
-		item := ConfigItem{
+		item := core.ConfigItem{
 			Name: "resHook",
-			Hooks: Hooks{
+			Hooks: core.Hooks{
 				Pre:      "echo pre",
 				Post:     "echo post",
 				OnChange: "echo change",
 			},
 		}
 
-		err := engine.RunParallel([]ConfigItem{item}, createFn)
+		err := engine.RunParallel([]core.ConfigItem{item}, createFn)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}

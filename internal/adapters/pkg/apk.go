@@ -98,3 +98,21 @@ func (r *ApkAdapter) Revert(ctx *core.SystemContext) error {
 	}
 	return nil
 }
+
+func (r *ApkAdapter) ListInstalled(ctx *core.SystemContext) ([]string, error) {
+	// apk info: lists all installed packages
+	output, err := runCommand(ctx, "apk", "info")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list apk packages: %w", err)
+	}
+	return splitLines(output), nil
+}
+
+func (r *ApkAdapter) RemoveBatch(names []string, ctx *core.SystemContext) error {
+	if len(names) == 0 {
+		return nil
+	}
+	args := append([]string{"del"}, names...)
+	_, err := runCommand(ctx, "apk", args...)
+	return err
+}

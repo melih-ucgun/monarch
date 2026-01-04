@@ -69,3 +69,21 @@ func (r *BrewAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 
 	return core.SuccessChange(fmt.Sprintf("Brew processed %s", r.Name)), nil
 }
+
+func (r *BrewAdapter) ListInstalled(ctx *core.SystemContext) ([]string, error) {
+	// brew leaves: lists packages that are not dependencies of other packages
+	output, err := runCommand(ctx, "brew", "leaves")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list brew packages: %w", err)
+	}
+	return splitLines(output), nil
+}
+
+func (r *BrewAdapter) RemoveBatch(names []string, ctx *core.SystemContext) error {
+	if len(names) == 0 {
+		return nil
+	}
+	args := append([]string{"uninstall"}, names...)
+	_, err := runCommand(ctx, "brew", args...)
+	return err
+}

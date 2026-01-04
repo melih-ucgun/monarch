@@ -14,6 +14,8 @@ var rootCmd = &cobra.Command{
 	Long:  `Veto is a declarative, agentless configuration management tool.`,
 }
 
+var verboseCount int
+
 func Execute() error {
 	return rootCmd.Execute()
 }
@@ -34,4 +36,5 @@ func init() {
 	pterm.DefaultHeader.Writer = os.Stderr
 
 	rootCmd.PersistentFlags().StringP("config", "c", "veto.yaml", "config file path")
+	rootCmd.PersistentFlags().CountVarP(&verboseCount, "verbose", "v", "Increase verbosity level (-v, -vv, -vvv)")
 }
