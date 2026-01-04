@@ -1,0 +1,49 @@
+variables:
+  test_root: "/tmp/veto_test_run"
+  greeting: "Hello Veto CI"
+
+resources:
+  # 1. Workspace Hazırlığı
+  - type: shell
+    name: setup-workspace
+    params:
+      command: "mkdir -p {{ .Variables.test_root }}"
+      check: "test -d {{ .Variables.test_root }}"
+
+  # 2. Dosya Oluşturma (Bağımlılık ve Template Testi)
+  - type: file
+    name: config-file
+    depends_on: ["shell:setup-workspace"]
+    params:
+      path: "{{ .Variables.test_root }}/config.txt"
+      content: |
+        App: Veto
+        Version: Test
+        Message: {{ .Variables.greeting }}
+
+  # 3. Sembolik Link (Symlink Testi)
+  - type: symlink
+    name: link-config
+    depends_on: ["file:config-file"]
+    params:
+      path: "{{ .Variables.test_root }}/config_link.txt"
+      target: "{{ .Variables.test_root }}/config.txt"
+
+  # 4. Git Repo Klonlama (Network ve Git Testi)
+  - type: git
+    name: clone-self
+    depends_on: ["shell:setup-workspace"]
+    params:
+      repo: "https://github.com/melih-ucgun/veto.git"
+      dest: "{{ .Variables.test_root }}/veto-repo"
+      depth: 1
+
+  # 5. Shell Script Çalıştırma
+  - type: shell
+    name: verify-content
+    depends_on: ["symlink:link-config"]
+    params:
+      command: "grep '{{ .Variables.greeting }}' {{ .Variables.test_root }}/config_link.txt"
+
+  # 6. Dizin Temizliği (Clean up - Opsiyonel, test sonrası durumu görmek için kapalı olabilir)
+  # Testin sonunda temizlenmesi Go testi tarafından yapılmalı, burada değil.
