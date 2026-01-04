@@ -22,6 +22,9 @@ const (
 
 // GetVetoDir returns the root directory name for Veto configuration
 func GetVetoDir() string {
+	if env := os.Getenv("VETO_HOME"); env != "" {
+		return env
+	}
 	return DefaultDirName
 }
 

@@ -1,9 +1,9 @@
 os: linux
-kernel: 6.18.2-2-cachyos
+kernel: 6.18.3-arch1-1
 distro: cachyos
 version: Rolling Release
 init_system: systemd
-hostname: monarch
+hostname: 'sh: line 1: hostname: command not found'
 hardware:
     cpu_model: AMD Ryzen 7 7730U with Radeon Graphics
     cpu_core: 16

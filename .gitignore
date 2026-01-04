@@ -43,3 +43,6 @@ internal/engine/embedded/veto-linux-*
 # Temporary Test Files
 test-*.yaml
 history-test-file
+tests/artifacts/
+.veto_test/
+
