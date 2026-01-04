@@ -45,5 +45,19 @@ resources:
     params:
       command: "grep '{{ .Variables.greeting }}' {{ .Variables.test_root }}/config_link.txt"
 
-  # 6. Dizin Temizliği (Clean up - Opsiyonel, test sonrası durumu görmek için kapalı olabilir)
-  # Testin sonunda temizlenmesi Go testi tarafından yapılmalı, burada değil.
+  # 6. Paket Yükleme Testi (Cross-Distro)
+  # Veto, arka planda hangi distro'da olduğunu algılayıp (apt, dnf, pacman) doğru komutu kullanır.
+  # 'jq' paketi hemen hemen tüm depolarda aynı isimdedir.
+  - type: pkg
+    name: install-common-pkg
+    params:
+      name: jq
+      state: present
+
+  # 7. Paket Doğrulaması
+  - type: shell
+    name: verify-pkg
+    depends_on: ["pkg:install-common-pkg"]
+    params:
+      command: "jq --version"
+
