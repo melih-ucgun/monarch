@@ -37,4 +37,5 @@ func init() {
 
 	rootCmd.PersistentFlags().StringP("config", "c", "veto.yaml", "config file path")
 	rootCmd.PersistentFlags().CountVarP(&verboseCount, "verbose", "v", "Increase verbosity level (-v, -vv, -vvv)")
+	rootCmd.PersistentFlags().Bool("decrypt", true, "Decrypt secret values using master key")
 }

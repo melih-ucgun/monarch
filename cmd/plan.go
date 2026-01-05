@@ -38,7 +38,8 @@ var planCmd = &cobra.Command{
 		ctx.DryRun = true // explicit
 
 		// 2. Load Config
-		cfg, err := config.LoadConfig(configPath)
+		decrypt, _ := cmd.Flags().GetBool("decrypt")
+		cfg, err := config.LoadConfig(configPath, decrypt)
 		if err != nil {
 			spinner.Fail("Failed to load config: " + err.Error())
 			os.Exit(1)

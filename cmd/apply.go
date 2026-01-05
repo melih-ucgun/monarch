@@ -56,7 +56,8 @@ Updates %s with the results.`, consts.GetStateFilePath()),
 			}
 		}
 
-		if err := runApply(configFile, inventoryFile, concurrency, dryRun, noSnapshot, pruneMode); err != nil {
+		decrypt, _ := cmd.Flags().GetBool("decrypt")
+		if err := runApply(configFile, inventoryFile, concurrency, dryRun, noSnapshot, pruneMode, decrypt); err != nil {
 			os.Exit(1)
 		}
 	},
@@ -71,7 +72,7 @@ func init() {
 	applyCmd.Flags().IntVarP(&concurrency, "concurrency", "C", 5, "Number of concurrent hosts")
 }
 
-func runApply(configFile, invFile string, concurrency int, isDryRun bool, skipSnapshot bool, isPrune bool) error {
+func runApply(configFile, invFile string, concurrency int, isDryRun bool, skipSnapshot bool, isPrune bool, decrypt bool) error {
 	// Header
 	pterm.DefaultHeader.WithFullWidth().WithBackgroundStyle(pterm.NewStyle(pterm.BgLightBlue)).
 		WithTextStyle(pterm.NewStyle(pterm.FgBlack, pterm.Bold)).
@@ -161,7 +162,7 @@ func runApply(configFile, invFile string, concurrency int, isDryRun bool, skipSn
 
 	// 3. Load Configuration
 	spinnerLoad, _ := pterm.DefaultSpinner.Start("Loading configuration...")
-	cfg, err := config.LoadConfig(configFile)
+	cfg, err := config.LoadConfig(configFile, decrypt)
 	if err != nil {
 		spinnerLoad.Fail(fmt.Sprintf("Error loading config file '%s': %v", configFile, err))
 		return err

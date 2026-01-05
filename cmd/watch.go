@@ -29,11 +29,12 @@ Polls the file system every few seconds (configurable).`,
 		// İlk başlangıçta bir kez çalıştır
 		// İlk başlangıçta bir kez çalıştır
 		// Watch mode runs locally, so inventory is empty string and concurrency is not used (pass 1).
-		if err := runApply(configFile, "", 1, dryRun, !withSnapshot, false); err != nil {
+		decrypt, _ := cmd.Flags().GetBool("decrypt")
+		if err := runApply(configFile, "", 1, dryRun, !withSnapshot, false, decrypt); err != nil {
 			fmt.Printf("⚠️ Initial apply failed, but keeping watch...\n")
 		}
 
-		watchLoop(configFile, interval)
+		watchLoop(configFile, interval, decrypt)
 	},
 }
 
@@ -44,7 +45,7 @@ func init() {
 	watchCmd.Flags().BoolVar(&withSnapshot, "with-snapshot", false, "Enable automatic snapshots during watch")
 }
 
-func watchLoop(filename string, intervalSec int) {
+func watchLoop(filename string, intervalSec int, decrypt bool) {
 	lastModTime := time.Time{}
 
 	// İlk dosya bilgisini al
@@ -74,7 +75,7 @@ func watchLoop(filename string, intervalSec int) {
 
 			// Apply işlemini çağır (cmd/apply.go içindeki fonksiyonu kullanıyoruz)
 			// Not: runApply fonksiyonu aynı pakette (cmd) olduğu için erişilebilir.
-			if err := runApply(filename, "", 1, dryRun, !withSnapshot, false); err != nil {
+			if err := runApply(filename, "", 1, dryRun, !withSnapshot, false, decrypt); err != nil {
 				fmt.Printf("❌ Apply failed: %v\n", err)
 			} else {
 				fmt.Printf("✅ Update successful. Watching for new changes...\n")

@@ -60,7 +60,7 @@ type Host struct {
 }
 
 // LoadConfig reads the YAML file at the specified path and converts it into a Config struct.
-func LoadConfig(path string) (*Config, error) {
+func LoadConfig(path string, decrypt bool) (*Config, error) {
 	// Get absolute path
 	absPath, err := filepath.Abs(path)
 	if err != nil {
@@ -102,7 +102,9 @@ func LoadConfig(path string) (*Config, error) {
 
 	// Recursive loading finished, now perform variable expansion on all string values
 	expandConfig(cfg)
-	decryptConfig(cfg)
+	if decrypt {
+		decryptConfig(cfg)
+	}
 
 	return cfg, nil
 }
