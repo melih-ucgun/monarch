@@ -1,0 +1,33 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch: # Manuel tetikleme imkanı sağlar
+
+jobs:
+  e2e-linux:
+    name: E2E Integration (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Run E2E Go Tests
+        run: |
+          # Temel dosya ve git operasyonlarını test eden Go E2E testleri.
+          # Sudo kullanıyoruz çünkü test içindeki 'pkg' adaptörü apt-get çalıştırıyor.
+          sudo -E env "PATH=$PATH" go test -v ./tests/e2e_test.go
+
+      - name: Run Docker Integration Tests (Arch Linux)
+        run: |
+          # Bu adım Veto'yu gerçek bir izole sistemde (Arch Linux container) test eder.
+          # Paket yönetimi, kullanıcı yönetimi ve rollback mekanizmalarını doğrular.
+          docker build -t veto-integration -f tests/integration/Dockerfile .
+          docker run --rm veto-integration
