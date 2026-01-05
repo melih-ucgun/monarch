@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/melih-ucgun/veto/internal/core"
+	"github.com/melih-ucgun/veto/internal/utils"
 )
 
 func init() {
@@ -51,6 +52,12 @@ func NewGroupAdapter(name string, params map[string]interface{}) core.Resource {
 func (r *GroupAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Name == "" {
 		return fmt.Errorf("group name is required")
+	}
+	if !utils.IsValidName(r.Name) {
+		return fmt.Errorf("invalid group name '%s': must match regex ^[a-z_][a-z0-9_-]*$", r.Name)
+	}
+	if !utils.IsOneOf(r.State, "present", "absent") {
+		return fmt.Errorf("invalid state '%s': must be one of [present, absent]", r.State)
 	}
 	return nil
 }

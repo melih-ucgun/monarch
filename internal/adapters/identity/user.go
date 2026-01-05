@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/melih-ucgun/veto/internal/core"
+	"github.com/melih-ucgun/veto/internal/utils"
 )
 
 func init() {
@@ -68,6 +69,12 @@ func NewUserAdapter(name string, params map[string]interface{}) core.Resource {
 func (r *UserAdapter) Validate(ctx *core.SystemContext) error {
 	if r.Name == "" {
 		return fmt.Errorf("username is required")
+	}
+	if !utils.IsValidName(r.Name) {
+		return fmt.Errorf("invalid username '%s': must match regex ^[a-z_][a-z0-9_-]*$", r.Name)
+	}
+	if !utils.IsOneOf(r.State, "present", "absent") {
+		return fmt.Errorf("invalid state '%s': must be one of [present, absent]", r.State)
 	}
 	return nil
 }

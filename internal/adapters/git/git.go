@@ -9,6 +9,7 @@ import (
 	"github.com/pterm/pterm"
 
 	"github.com/melih-ucgun/veto/internal/core"
+	"github.com/melih-ucgun/veto/internal/utils"
 )
 
 func init() {
@@ -75,6 +76,9 @@ func (r *GitAdapter) Validate(ctx *core.SystemContext) error {
 	}
 	if r.Dest == "" {
 		return fmt.Errorf("git destination path is required")
+	}
+	if !utils.IsOneOf(r.State, "present", "absent") {
+		return fmt.Errorf("invalid state '%s': must be one of [present, absent]", r.State)
 	}
 	return nil
 }

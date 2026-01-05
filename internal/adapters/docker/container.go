@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/melih-ucgun/veto/internal/core"
+	"github.com/melih-ucgun/veto/internal/utils"
 )
 
 func init() {
@@ -47,6 +48,9 @@ func (a *ContainerAdapter) GetType() string { return a.Binary + "_container" }
 func (a *ContainerAdapter) Validate(ctx *core.SystemContext) error {
 	if a.Params["image"] == "" && a.State != "absent" {
 		return fmt.Errorf("image is required for container %s", a.Name)
+	}
+	if !utils.IsOneOf(a.State, "running", "stopped", "absent") {
+		return fmt.Errorf("invalid state '%s': must be one of [running, stopped, absent]", a.State)
 	}
 	return nil
 }
