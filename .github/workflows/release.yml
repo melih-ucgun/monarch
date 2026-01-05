@@ -33,7 +33,7 @@ jobs:
           fi
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Run Tests
         run: |
@@ -45,7 +45,7 @@ jobs:
     needs: test # Only run release if test job passes
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
