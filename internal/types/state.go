@@ -20,6 +20,8 @@ type TransactionChange struct {
 	Action     string `json:"action"`
 	Target     string `json:"target,omitempty"`
 	BackupPath string `json:"backup_path,omitempty"`
+	Diff       string `json:"diff,omitempty"`   // Diff of the change
+	Detail     string `json:"detail,omitempty"` // Extra details (e.g. error msg)
 }
 
 // Transaction represents a session of changes (e.g. one apply run).

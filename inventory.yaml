@@ -1,0 +1,5 @@
+hosts:
+  - name: localhost
+    connection: local
+    address: 127.0.0.1
+    user: melih

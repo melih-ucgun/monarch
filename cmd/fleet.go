@@ -3,10 +3,12 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"text/tabwriter"
 
 	"github.com/melih-ucgun/veto/internal/core"
+	"github.com/melih-ucgun/veto/internal/fleet"
 	"github.com/melih-ucgun/veto/internal/inventory"
 	"github.com/melih-ucgun/veto/internal/system"
 	"github.com/melih-ucgun/veto/internal/transport"
@@ -166,8 +168,75 @@ var factsCmd = &cobra.Command{
 	},
 }
 
+// execCmd represents the exec command
+var execCmd = &cobra.Command{
+	Use:   "exec -- [command]",
+	Short: "Run arbitrary command on all hosts",
+	Run: func(cmd *cobra.Command, args []string) {
+		// 1. Load Inventory
+		invFile, _ := cmd.Flags().GetString("inventory")
+		concurrency, _ := cmd.Flags().GetInt("concurrency")
+		sudo, _ := cmd.Flags().GetBool("sudo")
+
+		if invFile == "" {
+			invFile = "inventory.yaml"
+		}
+
+		inv, err := inventory.LoadInventory(invFile)
+		if err != nil {
+			atomic.Error.Printf("Failed to load inventory: %v\n", err)
+			return
+		}
+
+		// 2. Parse Command
+		// Args after double dash are treated as command
+		if len(args) == 0 {
+			atomic.Error.Println("No command specified. Usage: veto fleet exec -- \"uptime\"")
+			return
+		}
+		command := strings.Join(args, " ")
+
+		// 3. Auth Check
+		if sudo {
+			if err := ensureSudoPasswords(inv.Hosts); err != nil {
+				atomic.Error.Printf("Auth Error: %v\n", err)
+				return
+			}
+		}
+
+		// 4. Validate Hosts keys/connection
+		// (Skipped for speed, Executor handles per-host connection errors)
+
+		// 5. Build & Run Executor
+		// We need to import the new fleet package.
+		// Since we are in 'cmd' package, and 'fleetCmd' var is here, we are good.
+		// But wait, 'internal/fleet' package name conflicts with 'fleetCmd' var name semantically?
+		// No, `fleet` package is imported as `fleet` (if we alias it or verify imports).
+		// Currently `cmd/fleet.go` imports `github.com/melih-ucgun/veto/internal/system` etc.
+		// I need to start using `github.com/melih-ucgun/veto/internal/fleet`.
+		// But wait, `cmd/fleet.go` ALREADY imports `internal/fleet` (implied by file content I saw earlier? No wait, let's check).
+		// I saw earlier: `github.com/melih-ucgun/veto/internal/fleet` // New import needed maybe?
+		// Previous `apply` command imported `fleet`. So it should be fine.
+
+		// However, I need to make sure I add the import if it's missing or use the existing alias.
+		// Let's rely on `goimports` behavior or manual check.
+		// Since I'm using `replace_file_content`, I should probably check imports first.
+		// `cmd/fleet.go` previously imported `internal/core`, `inventory`, `system`, `transport`.
+		// I need to ensure `github.com/melih-ucgun/veto/internal/fleet` is imported.
+
+		exec := fleet.NewExecutor(inv.Hosts, concurrency, sudo)
+		if err := exec.Run(command); err != nil {
+			// Error is already printed by Executor summary, but command exit code should reflect it
+			os.Exit(1)
+		}
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(fleetCmd)
 	fleetCmd.AddCommand(factsCmd)
+	fleetCmd.AddCommand(execCmd)
 	fleetCmd.PersistentFlags().StringP("inventory", "i", "inventory.yaml", "Path to inventory file")
+	execCmd.Flags().IntP("concurrency", "C", 10, "Number of concurrent hosts")
+	execCmd.Flags().Bool("sudo", false, "Run with sudo privileges")
 }

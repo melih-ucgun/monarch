@@ -169,6 +169,15 @@ func (e *Engine) runSequential(items []ConfigItem, createFn ResourceCreator) err
 			}
 		}
 
+		// 2. Capture Diff (if supported) BEFORE Apply
+		var pendingDiff string
+		if differ, ok := res.(Differ); ok {
+			// We ignore error here as Diff might fail if resource is invalid, but we proceed to Apply which handles it
+			if d, err := differ.Diff(e.Context); err == nil {
+				pendingDiff = d
+			}
+		}
+
 		// 2. Apply resource
 		result, err := res.Apply(e.Context)
 
@@ -200,6 +209,7 @@ func (e *Engine) runSequential(items []ConfigItem, createFn ResourceCreator) err
 				Type:   item.Type,
 				Name:   item.Name,
 				Action: "applied",
+				Diff:   pendingDiff,
 			}
 
 			// Try to get target path (specifically for file)
@@ -335,6 +345,14 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 				e.Context.Logger.Debug(fmt.Sprintf("[%s] Pre-Hook executed", it.Name))
 			}
 
+			// 2. Capture Diff (if supported) BEFORE Apply
+			var pendingDiff string
+			if differ, ok := res.(Differ); ok {
+				if d, err := differ.Diff(e.Context); err == nil {
+					pendingDiff = d
+				}
+			}
+
 			// 2. Apply resource
 			result, err := res.Apply(e.Context)
 
@@ -387,6 +405,7 @@ func (e *Engine) RunParallel(layer []ConfigItem, createFn ResourceCreator) error
 					Type:   it.Type,
 					Name:   it.Name,
 					Action: "applied",
+					Diff:   pendingDiff,
 				}
 
 				// Try to get target path

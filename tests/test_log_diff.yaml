@@ -1,0 +1,9 @@
+resources:
+  - type: file
+    name: logs_diff_test.txt
+    state: present
+    params:
+      path: /tmp/logs_diff_test.txt
+      content: |
+        Matches content v2 (UPDATED)
+        Line 2 matches
