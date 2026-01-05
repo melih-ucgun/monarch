@@ -237,6 +237,10 @@ func runApply(configFile, invFile string, concurrency int, isDryRun bool, skipSn
 			return fmt.Errorf("failed to load inventory: %w", err)
 		}
 
+		if err := ensureSudoPasswords(inv.Hosts); err != nil {
+			return err
+		}
+
 		fleetMgr := fleet.NewFleetManager(inv.Hosts, isDryRun, isPrune, ctx.Logger)
 		if err := fleetMgr.ApplyConfig(layers, concurrency, createFn); err != nil {
 			return err

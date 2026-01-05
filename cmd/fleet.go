@@ -52,6 +52,22 @@ var factsCmd = &cobra.Command{
 		results := make(chan HostFact, len(inv.Hosts))
 		var wg sync.WaitGroup
 
+		// Pre-flight: Ensure we have sudo passwords if needed
+		// For facts gathering, we Force sudo usage usually, or we should respect inventory?
+		// The code below hardcodes BecomeMethod="sudo". So we should ensure key exists.
+		for i := range inv.Hosts {
+			if inv.Hosts[i].Vars == nil {
+				inv.Hosts[i].Vars = make(map[string]string)
+			}
+			// Force become method for facts, or just set it so prompt triggers
+			inv.Hosts[i].Vars["ansible_become_method"] = "sudo"
+		}
+
+		if err := ensureSudoPasswords(inv.Hosts); err != nil {
+			atomic.Error.Printf("Auth Error: %v\n", err)
+			return
+		}
+
 		spinner, _ := atomic.DefaultSpinner.Start(fmt.Sprintf("Gathering facts from %d hosts...", len(inv.Hosts)))
 
 		for _, host := range inv.Hosts {
@@ -62,12 +78,13 @@ var factsCmd = &cobra.Command{
 				// Map inventory.Host to transport.HostConfig for Transport
 				// TODO: Load vars for Become info if needed
 				cfgHost := transport.HostConfig{
-					Name:         h.Name,
-					Address:      h.Address,
-					User:         h.User,
-					Port:         h.Port,
-					SSHKeyPath:   h.KeyPath,
-					BecomeMethod: "sudo", // Default assumption for facts gathering
+					Name:           h.Name,
+					Address:        h.Address,
+					User:           h.User,
+					Port:           h.Port,
+					SSHKeyPath:     h.KeyPath,
+					BecomeMethod:   "sudo",
+					BecomePassword: h.Vars["ansible_become_password"],
 				}
 
 				// Create Transport

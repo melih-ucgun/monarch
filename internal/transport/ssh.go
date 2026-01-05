@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -92,6 +93,12 @@ func (t *SSHTransport) Execute(ctx context.Context, cmd string) (string, error) 
 	if t.Logger != nil {
 		t.Logger.Trace("Executing remote command", "host", t.config.Name, "command", cmd)
 	}
+
+	// Check if sudo is required
+	if t.config.BecomeMethod == "sudo" {
+		return t.runRemoteSecureCaptured(ctx, cmd, t.config.BecomePassword)
+	}
+
 	session, err := t.client.NewSession()
 	if err != nil {
 		return "", err
@@ -100,6 +107,43 @@ func (t *SSHTransport) Execute(ctx context.Context, cmd string) (string, error) 
 
 	out, err := session.CombinedOutput(cmd)
 	return string(out), err
+}
+
+// runRemoteSecureCaptured runs command with sudo and captures output
+func (t *SSHTransport) runRemoteSecureCaptured(ctx context.Context, cmdStr string, sudoPassword string) (string, error) {
+	session, err := t.client.NewSession()
+	if err != nil {
+		return "", err
+	}
+	defer session.Close()
+
+	finalCmd := fmt.Sprintf("sudo -S -p '' %s", cmdStr)
+
+	stdin, err := session.StdinPipe()
+	if err != nil {
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	session.Stdout = &buf
+	session.Stderr = &buf
+
+	if err := session.Start(finalCmd); err != nil {
+		return "", err
+	}
+
+	// Send password
+	go func() {
+		defer stdin.Close()
+		if sudoPassword != "" {
+			fmt.Fprintln(stdin, sudoPassword)
+		}
+	}()
+
+	err = session.Wait()
+	output := buf.String()
+
+	return output, err
 }
 
 // RunRemoteSecure: Komutu çalıştırır, sudo gerekirse şifreyi pipe ile verir.
