@@ -1,23 +1,18 @@
-os: linux
-kernel: 6.18.3-arch1-1
-distro: cachyos
-version: Rolling Release
-init_system: systemd
-hostname: 'sh: line 1: hostname: command not found'
-hardware:
-    cpu_model: AMD Ryzen 7 7730U with Radeon Graphics
-    cpu_core: 16
-    ram_total: 13.5 GB
-    gpu_vendor: AMD
-    gpu_model: Advanced Micro Devices, Inc. [AMD/ATI] B...
-env:
-    shell: /usr/bin/zsh
-    lang: en_US.UTF-8
-    term: xterm-kitty
-    timezone: Europe/Istanbul
-fs:
-    root_fs_type: btrfs
-user: melih
-home_dir: /home/melih
-uid: "1000"
-gid: "1000"
+resources:
+    - id: ""
+      name: test_veto_add
+      type: file
+      state: present
+      priority: 0
+      when: ""
+      depends_on: []
+      params:
+        method: symlink
+        path: /tmp/test_veto_add
+        source: files/root/tmp/test_veto_add
+      hooks:
+        pre: ""
+        post: ""
+        on_change: ""
+        on_fail: ""
+      prune: false
