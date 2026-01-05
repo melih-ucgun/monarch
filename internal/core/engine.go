@@ -22,13 +22,14 @@ type StateUpdater interface {
 
 // ConfigItem is the raw configuration part that the engine will process.
 type ConfigItem struct {
-	Name   string
-	Type   string
-	State  string
-	When   string // Condition to evaluate
-	Params map[string]interface{}
-	Hooks  Hooks
-	Prune  bool `yaml:"prune"`
+	Name      string
+	Type      string
+	State     string
+	When      string // Condition to evaluate
+	Params    map[string]interface{}
+	Hooks     Hooks
+	Prune     bool     `yaml:"prune"`
+	DependsOn []string `yaml:"depends_on"`
 }
 
 // Hooks defines lifecycle hooks for a resource execution.
@@ -61,6 +62,46 @@ type ResourceCreator func(resType, name string, params map[string]interface{}, c
 
 // Run processes the given configuration list.
 func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
+	// Check if any item has dependencies
+	hasDeps := false
+	for _, item := range items {
+		if len(item.DependsOn) > 0 {
+			hasDeps = true
+			break
+		}
+	}
+
+	// Legacy / Sequential Mode if no dependencies
+	// This preserves exact behavior for existing configs that rely on file order
+	if !hasDeps {
+		return e.runSequential(items, createFn)
+	}
+
+	// DAG Mode
+	graph := NewGraph()
+	if err := graph.BuildGraph(items); err != nil {
+		return fmt.Errorf("failed to build dependency graph: %w", err)
+	}
+
+	layers, err := graph.TopologicalSort()
+	if err != nil {
+		return fmt.Errorf("dependency error: %w", err)
+	}
+
+	e.Context.Logger.Info(fmt.Sprintf("Executing %d layers of resources", len(layers)))
+
+	for i, layer := range layers {
+		e.Context.Logger.Debug(fmt.Sprintf("Executing Layer %d (%d resources)", i+1, len(layer)))
+		if err := e.RunParallel(layer, createFn); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// runSequential is the legacy execution mode (moved from original Run)
+func (e *Engine) runSequential(items []ConfigItem, createFn ResourceCreator) error {
 	errCount := 0
 
 	// Transaction recording
@@ -72,9 +113,6 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 	}
 
 	// Initialize Backup Manager for this transaction
-	// Since contexts are shared in Run (sequential), we can set it on the main context
-	// BUT parallel run shares context too? RunParallel creates goroutines sharing e.Context.
-	// We must be careful if Engine is reused. But typically Engine is per-run.
 	e.Context.TxID = transaction.ID
 	e.Context.BackupManager = state.NewBackupManager("") // Use default path
 
@@ -85,6 +123,27 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 		}
 		item.Params["state"] = item.State
 		item.Params["prune"] = item.Prune
+
+		// 0. Check Condition (When)
+		if item.When != "" {
+			shouldRun, err := EvaluateCondition(item.When, e.Context)
+			if err != nil {
+				e.Context.Logger.Error(fmt.Sprintf("[%s] Condition Error: %v", item.Name, err))
+				errCount++
+				continue
+			}
+			if !shouldRun {
+				e.Context.Logger.Debug(fmt.Sprintf("[%s] Skipped (Condition not met)", item.Name))
+				continue
+			}
+		}
+
+		// 0.5 Render Templates in Params
+		if err := renderParams(item.Params, e.Context); err != nil {
+			e.Context.Logger.Error(fmt.Sprintf("[%s] Template Error: %v", item.Name, err))
+			errCount++
+			continue
+		}
 
 		// 1. Create resource
 		res, err := createFn(item.Type, item.Name, item.Params, e.Context)
@@ -101,16 +160,40 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 			continue
 		}
 
+		// 1.9 PRE-HOOK
+		if item.Hooks.Pre != "" {
+			if err := executeHook(e.Context, item.Hooks.Pre); err != nil {
+				e.Context.Logger.Error(fmt.Sprintf("[%s] Pre-Hook Failed: %v", item.Name, err))
+				errCount++
+				continue
+			}
+		}
+
 		// 2. Apply resource
 		result, err := res.Apply(e.Context)
+
+		// 2.1 POST-HOOK
+		if item.Hooks.Post != "" {
+			_ = executeHook(e.Context, item.Hooks.Post)
+		}
 
 		status := "success"
 		if err != nil {
 			status = "failed"
 			errCount++
 			e.Context.Logger.Error(fmt.Sprintf("[%s] Failed: %v", item.Name, err))
+
+			// 2.2 ON-FAIL HOOK
+			if item.Hooks.OnFail != "" {
+				_ = executeHook(e.Context, item.Hooks.OnFail)
+			}
 		} else if result.Changed {
 			e.Context.Logger.Info(fmt.Sprintf("[%s] %s", item.Name, result.Message))
+
+			// 2.3 ON-CHANGE HOOK
+			if item.Hooks.OnChange != "" {
+				_ = executeHook(e.Context, item.Hooks.OnChange)
+			}
 
 			// Record change for History
 			change := types.TransactionChange{
@@ -136,6 +219,8 @@ func (e *Engine) Run(items []ConfigItem, createFn ResourceCreator) error {
 			}
 
 			transaction.Changes = append(transaction.Changes, change)
+			// Add to history for rollback
+			e.AppliedHistory = append(e.AppliedHistory, res)
 
 		} else {
 			msg := "OK"

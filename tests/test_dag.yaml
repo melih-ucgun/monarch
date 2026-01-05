@@ -1,0 +1,31 @@
+resources:
+  - type: file
+    name: file_a
+    state: present
+    params:
+      path: "/tmp/veto_dag_a"
+      content: "I am A"
+
+  - type: file
+    name: file_b
+    state: present
+    depends_on: ["file:file_a"]
+    params:
+      path: "/tmp/veto_dag_b"
+      content: "I am B (Depends on A)"
+
+  - type: file
+    name: file_c
+    state: present
+    depends_on: ["file:file_a"]
+    params:
+      path: "/tmp/veto_dag_c"
+      content: "I am C (Depends on A)"
+
+  - type: file
+    name: file_d
+    state: present
+    depends_on: ["file:file_b", "file:file_c"]
+    params:
+      path: "/tmp/veto_dag_d"
+      content: "I am D (Depends on B and C)"
