@@ -17,14 +17,15 @@ func init() {
 
 type FileAdapter struct {
 	core.BaseResource
-	Path       string
-	Source     string // Kopyalanacak kaynak dosya (opsiyonel)
-	Content    string // Yazılacak içerik (opsiyonel)
-	Method     string // copy (default), symlink
-	Mode       os.FileMode
-	State      string // present, absent
-	BackupPath string // Yedeklenen dosyanın yolu
-	Prune      bool   // Dizin için: konfikte olmayan dosyaları sil
+	Path            string
+	Source          string // Kopyalanacak kaynak dosya (opsiyonel)
+	Content         string // Yazılacak içerik (opsiyonel)
+	Method          string // copy (default), symlink
+	Mode            os.FileMode
+	State           string // present, absent
+	BackupPath      string // Yedeklenen dosyanın yolu
+	Prune           bool   // Dizin için: konfikte olmayan dosyaları sil
+	ActionPerformed string // created, modified, deleted
 }
 
 func (r *FileAdapter) GetBackupPath() string {
@@ -259,6 +260,12 @@ func (r *FileAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 		return core.SuccessChange(msg), nil
 	}
 
+	// Check existence to determine action type (created vs modified)
+	exists := false
+	if _, err := ctx.FS.Stat(r.Path); err == nil {
+		exists = true
+	}
+
 	// YEDEKLEME
 	if ctx.BackupManager != nil && ctx.TxID != "" {
 		ctx.Logger.Debug("[%s] Creating backup of %s", r.Name, r.Path)
@@ -275,6 +282,7 @@ func (r *FileAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 		if err := ctx.FS.Remove(r.Path); err != nil {
 			return core.Failure(err, "Failed to delete file"), err
 		}
+		r.ActionPerformed = "deleted"
 		return core.SuccessChange("File deleted"), nil
 	}
 
@@ -305,6 +313,16 @@ func (r *FileAdapter) Apply(ctx *core.SystemContext) (core.Result, error) {
 		}
 	}
 
+	if r.BackupPath != "" {
+		r.ActionPerformed = "modified"
+	} else {
+		if exists {
+			r.ActionPerformed = "modified"
+		} else {
+			r.ActionPerformed = "created"
+		}
+	}
+
 	return core.SuccessChange(fmt.Sprintf("File %s created/updated", r.Path)), nil
 }
 
@@ -314,10 +332,18 @@ func (r *FileAdapter) Revert(ctx *core.SystemContext) error {
 		return r.copyFile(ctx, r.BackupPath, r.Path, r.Mode)
 	}
 
-	if r.State == "present" {
+	// Only delete if we specifically created it
+	if r.ActionPerformed == "created" {
+		ctx.Logger.Info("Reverting creation of %s (deleting)", r.Path)
 		return ctx.FS.Remove(r.Path)
 	}
 
+	if r.ActionPerformed == "modified" {
+		ctx.Logger.Warn("Cannot revert modification of %s: no backup found.", r.Path)
+		return nil
+	}
+
+	// Fallback for legacy/unknown state: Do nothing is safer than Delete
 	return nil
 }
 
