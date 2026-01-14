@@ -10,6 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/melih-ucgun/veto/internal/adapters/snapshot"
+	"github.com/melih-ucgun/veto/internal/adapters/ui" // New import
 	"github.com/melih-ucgun/veto/internal/config"
 	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/melih-ucgun/veto/internal/core"
@@ -73,10 +74,11 @@ func init() {
 }
 
 func runApply(configFile, invFile string, concurrency int, isDryRun bool, skipSnapshot bool, isPrune bool, decrypt bool) error {
+	// Initialize UI
+	userInterface := ui.NewPtermUI()
+
 	// Header
-	pterm.DefaultHeader.WithFullWidth().WithBackgroundStyle(pterm.NewStyle(pterm.BgLightBlue)).
-		WithTextStyle(pterm.NewStyle(pterm.FgBlack, pterm.Bold)).
-		Println("Veto Config Manager")
+	userInterface.Title("Veto Config Manager")
 
 	if isDryRun {
 		pterm.ThemeDefault.SecondaryStyle.Println("Running in DRY-RUN mode")
@@ -84,7 +86,7 @@ func runApply(configFile, invFile string, concurrency int, isDryRun bool, skipSn
 
 	// 1. Detect System (Local Context for Info/Snapshots)
 	localTransport := transport.NewLocalTransport()
-	ctx := core.NewSystemContext(isDryRun, localTransport)
+	ctx := core.NewSystemContext(isDryRun, localTransport, userInterface)
 
 	// Set Logger Level
 	logLevel := core.LevelInfo
@@ -241,7 +243,7 @@ func runApply(configFile, invFile string, concurrency int, isDryRun bool, skipSn
 			return err
 		}
 
-		fleetMgr := fleet.NewFleetManager(inv.Hosts, isDryRun, isPrune, ctx.Logger)
+		fleetMgr := fleet.NewFleetManager(inv.Hosts, isDryRun, isPrune, ctx.Logger, userInterface)
 		if err := fleetMgr.ApplyConfig(layers, concurrency, createFn); err != nil {
 			return err
 		}

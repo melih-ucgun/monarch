@@ -13,7 +13,7 @@ func TestDockerAdapter_Check_Running(t *testing.T) {
 	ctx := &core.SystemContext{
 		FS:        &core.RealFS{},
 		Transport: mockTransport,
-		Logger:    core.NewDefaultLogger(os.Stderr, core.LevelDebug),
+		Logger:    core.NewDefaultLogger(&core.NoOpUI{}, os.Stderr, core.LevelDebug),
 	}
 
 	// Mock Inspect Output (Running)
@@ -51,7 +51,7 @@ func TestDockerAdapter_Check_Stopped(t *testing.T) {
 	ctx := &core.SystemContext{
 		FS:        &core.RealFS{},
 		Transport: mockTransport,
-		Logger:    core.NewDefaultLogger(os.Stderr, core.LevelDebug),
+		Logger:    core.NewDefaultLogger(&core.NoOpUI{}, os.Stderr, core.LevelDebug),
 	}
 
 	// Mock Inspect Output (Stopped)
@@ -89,7 +89,7 @@ func TestDockerAdapter_Apply_Create(t *testing.T) {
 	ctx := &core.SystemContext{
 		FS:        &core.RealFS{},
 		Transport: mockTransport,
-		Logger:    core.NewDefaultLogger(os.Stderr, core.LevelDebug),
+		Logger:    core.NewDefaultLogger(&core.NoOpUI{}, os.Stderr, core.LevelDebug),
 	}
 
 	// Mock Inspect (Not Found)

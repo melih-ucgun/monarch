@@ -70,7 +70,7 @@ func LoadConfig(path string, decrypt bool) (*Config, error) {
 	// 0. Detect System & Set VETO_ VARIABLES for Template Expansion
 	// This happens BEFORE loading config so {{.OS}} works in 'includes'
 	// Passing nil transport as system.Detect should handle local fallback
-	ctx := core.NewSystemContext(false, nil)
+	ctx := core.NewSystemContext(false, nil, nil)
 	system.Detect(ctx) // Lightweight detection
 	os.Setenv("VETO_OS", ctx.OS)
 	os.Setenv("VETO_DISTRO", ctx.Distro)

@@ -46,7 +46,7 @@ func TestBrewAdapter_Check(t *testing.T) {
 			}
 
 			adapter := NewBrewAdapter(tt.packageName, map[string]interface{}{"state": tt.state}).(*BrewAdapter)
-			needsAction, err := adapter.Check(core.NewSystemContext(false, mockTr))
+			needsAction, err := adapter.Check(core.NewSystemContext(false, mockTr, nil))
 
 			if err != nil {
 				t.Fatalf("Check returned error: %v", err)
@@ -73,7 +73,7 @@ func TestBrewAdapter_Apply(t *testing.T) {
 			},
 		}
 
-		ctx := core.NewSystemContext(false, mockTr)
+		ctx := core.NewSystemContext(false, mockTr, nil)
 		result, err := adapter.Apply(ctx)
 
 		if err != nil {

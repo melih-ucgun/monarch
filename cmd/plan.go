@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/melih-ucgun/veto/internal/adapters/ui"
 	"github.com/melih-ucgun/veto/internal/config"
 	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/resource"
@@ -33,7 +34,8 @@ var planCmd = &cobra.Command{
 		// We use standard context.
 		// Plan works locally to generate plan for local? Or can use inventory?
 		// Existing code assumes local.
-		ctx := core.NewSystemContext(false, transport.NewLocalTransport())
+		ui := ui.NewPtermUI()
+		ctx := core.NewSystemContext(false, transport.NewLocalTransport(), ui)
 		system.Detect(ctx)
 		ctx.DryRun = true // explicit
 
