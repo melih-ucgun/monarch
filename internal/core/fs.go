@@ -21,6 +21,7 @@ type FileSystem interface {
 	Open(name string) (File, error)
 	Create(name string) (File, error)
 	ReadDir(name string) ([]fs.DirEntry, error)
+	Rename(oldpath, newpath string) error
 }
 
 // File is a minimal interface for a file object
@@ -50,6 +51,7 @@ func (f *RealFS) Chmod(name string, mode os.FileMode) error    { return os.Chmod
 func (f *RealFS) Open(name string) (File, error)               { return os.Open(name) }
 func (f *RealFS) Create(name string) (File, error)             { return os.Create(name) }
 func (f *RealFS) ReadDir(name string) ([]fs.DirEntry, error)   { return os.ReadDir(name) }
+func (f *RealFS) Rename(oldpath, newpath string) error         { return os.Rename(oldpath, newpath) }
 
 // CopyFile is a helper to copy a file using the FileSystem abstraction
 func CopyFile(fs FileSystem, src, dst string, mode os.FileMode) error {
