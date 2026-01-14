@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/melih-ucgun/veto/internal/adapters/ui"
 	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/resource"
@@ -52,7 +53,8 @@ var rollbackCmd = &cobra.Command{
 		pterm.DefaultHeader.Printf("Rolling Back %d Transactions", count)
 
 		// Initialize System Context
-		ctx := core.NewSystemContext(false, transport.NewLocalTransport())
+		ui := ui.NewPtermUI()
+		ctx := core.NewSystemContext(false, transport.NewLocalTransport(), ui)
 		system.Detect(ctx)
 
 		// Execute Rollback

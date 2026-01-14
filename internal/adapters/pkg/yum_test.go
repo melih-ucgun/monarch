@@ -46,7 +46,7 @@ func TestYumAdapter_Check(t *testing.T) {
 			}
 
 			adapter := NewYumAdapter(tt.packageName, map[string]interface{}{"state": tt.state}).(*YumAdapter)
-			needsAction, err := adapter.Check(core.NewSystemContext(false, mockTr))
+			needsAction, err := adapter.Check(core.NewSystemContext(false, mockTr, nil))
 
 			if err != nil {
 				t.Fatalf("Check returned error: %v", err)
@@ -73,7 +73,7 @@ func TestYumAdapter_Apply(t *testing.T) {
 			},
 		}
 
-		ctx := core.NewSystemContext(false, mockTr)
+		ctx := core.NewSystemContext(false, mockTr, nil)
 		result, err := adapter.Apply(ctx)
 
 		if err != nil {

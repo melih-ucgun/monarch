@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/melih-ucgun/veto/internal/adapters/ui"
 	"github.com/melih-ucgun/veto/internal/config"
 	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/melih-ucgun/veto/internal/core"
@@ -80,7 +81,8 @@ func runDriftCheck(cmd *cobra.Command) {
 	spinner, _ := pterm.DefaultSpinner.Start("Loading configuration...")
 
 	// 1. Setup Context
-	ctx := core.NewSystemContext(false, transport.NewLocalTransport())
+	ui := ui.NewPtermUI()
+	ctx := core.NewSystemContext(false, transport.NewLocalTransport(), ui)
 	system.Detect(ctx)
 
 	// 2. Load Active Config

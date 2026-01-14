@@ -252,6 +252,16 @@ func (e *Engine) runSequential(items []ConfigItem, createFn ResourceCreator) err
 
 	if errCount > 0 {
 		transaction.Status = "failed"
+		// Trigger Rollback for Sequential Mode
+		if !e.Context.DryRun {
+			pterm.Println()
+			pterm.Error.Println("Error occurred. Initiating Rollback...")
+
+			pterm.Warning.Printf("Visualizing Rollback for applied resources (%d)...\n", len(e.AppliedHistory))
+			e.rollback(e.AppliedHistory)
+
+			transaction.Status = "reverted"
+		}
 	}
 
 	// Save History

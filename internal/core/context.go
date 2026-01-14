@@ -82,7 +82,10 @@ type SystemFS struct {
 	RootFSType string `yaml:"root_fs_type"` // "ext4", "btrfs", "zfs"
 }
 
-func NewSystemContext(dryRun bool, tr Transport) *SystemContext {
+func NewSystemContext(dryRun bool, tr Transport, ui UI) *SystemContext {
+	if ui == nil {
+		ui = &NoOpUI{}
+	}
 	return &SystemContext{
 		Context:    context.Background(),
 		OS:         "unknown",
@@ -93,7 +96,7 @@ func NewSystemContext(dryRun bool, tr Transport) *SystemContext {
 		DryRun:     dryRun,
 		FS:         &RealFS{}, // Default to local filesystem
 		Transport:  tr,
-		Logger:     NewDefaultLogger(os.Stderr, LevelInfo),
+		Logger:     NewDefaultLogger(ui, os.Stderr, LevelInfo),
 		// Diğer alt structlar zero-value olarak başlar, detector tarafından doldurulur.
 	}
 }

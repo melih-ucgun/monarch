@@ -7,6 +7,7 @@ import (
 
 	"sort"
 
+	"github.com/melih-ucgun/veto/internal/adapters/ui"
 	"github.com/melih-ucgun/veto/internal/config"
 	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/melih-ucgun/veto/internal/core"
@@ -42,7 +43,8 @@ func RunImportInteractive(outputFile string, nonInteractive bool) {
 	spinner, _ := pterm.DefaultSpinner.Start("Detecting system context...")
 
 	// Discovery runs locally
-	ctx := core.NewSystemContext(false, transport.NewLocalTransport())
+	ui := ui.NewPtermUI()
+	ctx := core.NewSystemContext(false, transport.NewLocalTransport(), ui)
 	system.Detect(ctx)
 
 	spinner.UpdateText("Discovering packages and services...")

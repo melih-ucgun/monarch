@@ -85,7 +85,7 @@ func TestPacmanAdapter_Check(t *testing.T) {
 			}
 
 			adapter := NewPacmanAdapter(tt.packageName, map[string]interface{}{"state": tt.state}).(*PacmanAdapter)
-			needsAction, err := adapter.Check(core.NewSystemContext(false, mockTr))
+			needsAction, err := adapter.Check(core.NewSystemContext(false, mockTr, nil))
 
 			if err != nil {
 				t.Fatalf("Check returned error: %v", err)
@@ -110,7 +110,7 @@ func TestPacmanAdapter_Apply(t *testing.T) {
 			},
 		}
 
-		ctx := core.NewSystemContext(true, mockTr)
+		ctx := core.NewSystemContext(true, mockTr, nil)
 		result, err := adapter.Apply(ctx)
 
 		if err != nil {
@@ -141,7 +141,7 @@ func TestPacmanAdapter_Apply(t *testing.T) {
 			},
 		}
 
-		ctx := core.NewSystemContext(false, mockTr)
+		ctx := core.NewSystemContext(false, mockTr, nil)
 		result, err := adapter.Apply(ctx)
 
 		if err != nil {
@@ -175,7 +175,7 @@ func TestPacmanAdapter_Revert(t *testing.T) {
 			},
 		}
 
-		err := adapter.Revert(core.NewSystemContext(false, mockTr))
+		err := adapter.Revert(core.NewSystemContext(false, mockTr, nil))
 		if err != nil {
 			t.Fatalf("Revert failed: %v", err)
 		}

@@ -10,7 +10,6 @@ import (
 	"github.com/melih-ucgun/veto/internal/inventory"
 	"github.com/melih-ucgun/veto/internal/system"
 	"github.com/melih-ucgun/veto/internal/transport"
-	"github.com/pterm/pterm"
 )
 
 // FleetManager orchestrates operations across multiple hosts.
@@ -20,15 +19,17 @@ type FleetManager struct {
 	DryRun   bool
 	Prune    bool
 	Logger   core.Logger
+	UI       core.UI
 }
 
 // NewFleetManager creates a new FleetManager.
-func NewFleetManager(hosts []inventory.Host, dryRun bool, prune bool, logger core.Logger) *FleetManager {
+func NewFleetManager(hosts []inventory.Host, dryRun bool, prune bool, logger core.Logger, ui core.UI) *FleetManager {
 	return &FleetManager{
 		Hosts:  hosts,
 		DryRun: dryRun,
 		Prune:  prune,
 		Logger: logger,
+		UI:     ui,
 	}
 }
 
@@ -39,7 +40,7 @@ func (f *FleetManager) ApplyConfig(layers [][]core.ConfigItem, concurrency int, 
 	errChan := make(chan error, len(f.Hosts))
 	sem := make(chan struct{}, concurrency) // Semaphore for concurrency control
 
-	pterm.DefaultSection.Printf("Fleet Deployment: %d hosts (Concurrency: %d)", len(f.Hosts), concurrency)
+	f.UI.Section(fmt.Sprintf("Fleet Deployment: %d hosts (Concurrency: %d)", len(f.Hosts), concurrency))
 
 	for _, host := range f.Hosts {
 		wg.Add(1)
@@ -50,6 +51,8 @@ func (f *FleetManager) ApplyConfig(layers [][]core.ConfigItem, concurrency int, 
 
 			// Initialize Scoped Logger for this host
 			hostLogger := f.Logger.With("host", h.Name)
+			// Using hostLogger instead of UI for individual host logs to respect structured logging if needed
+			// But original code used hostLogger.Info which used pterm.Info via DefaultLogger.
 			hostLogger.Info("Connecting to host")
 
 			// 1. Initialize Transport
@@ -153,6 +156,6 @@ func (f *FleetManager) ApplyConfig(layers [][]core.ConfigItem, concurrency int, 
 	if errCount > 0 {
 		return fmt.Errorf("fleet execution failed on %d hosts", errCount)
 	}
-	pterm.Success.Println("Fleet execution completed successfully.")
+	f.UI.Success("Fleet execution completed successfully.")
 	return nil
 }

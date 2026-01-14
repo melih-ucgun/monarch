@@ -84,7 +84,7 @@ func (m *MockStateUpdater) AddTransaction(tx types.Transaction) error {
 }
 
 func TestEngine_RunParallel(t *testing.T) {
-	ctx := core.NewSystemContext(false, nil)
+	ctx := core.NewSystemContext(false, nil, nil)
 
 	t.Run("All success", func(t *testing.T) {
 		engine := core.NewEngine(ctx, nil)
@@ -201,7 +201,7 @@ func TestEngine_RunParallel(t *testing.T) {
 
 	t.Run("Hooks execution", func(t *testing.T) {
 		mockTransport := &MockTransport{}
-		ctx := core.NewSystemContext(false, mockTransport)
+		ctx := core.NewSystemContext(false, mockTransport, nil)
 		engine := core.NewEngine(ctx, nil)
 
 		res := &MockResource{Name: "resHook", ApplyResult: core.SuccessChange("ok")}

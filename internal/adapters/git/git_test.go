@@ -14,7 +14,7 @@ func TestGitAdapter_Check_Clone(t *testing.T) {
 	ctx := &core.SystemContext{
 		FS:        &core.RealFS{},
 		Transport: mockTransport,
-		Logger:    core.NewDefaultLogger(os.Stderr, core.LevelDebug),
+		Logger:    core.NewDefaultLogger(&core.NoOpUI{}, os.Stderr, core.LevelDebug),
 	}
 
 	tmpDir := t.TempDir()
@@ -47,7 +47,7 @@ func TestGitAdapter_Check_UpToDate(t *testing.T) {
 	ctx := &core.SystemContext{
 		FS:        &core.RealFS{},
 		Transport: mockTransport,
-		Logger:    core.NewDefaultLogger(os.Stderr, core.LevelDebug),
+		Logger:    core.NewDefaultLogger(&core.NoOpUI{}, os.Stderr, core.LevelDebug),
 	}
 
 	// Mock Git Commands
@@ -74,7 +74,7 @@ func TestGitAdapter_Apply_Clone(t *testing.T) {
 	ctx := &core.SystemContext{
 		FS:        &core.RealFS{},
 		Transport: mockTransport,
-		Logger:    core.NewDefaultLogger(os.Stderr, core.LevelDebug),
+		Logger:    core.NewDefaultLogger(&core.NoOpUI{}, os.Stderr, core.LevelDebug),
 	}
 
 	tmpDir := t.TempDir()

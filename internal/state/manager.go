@@ -3,6 +3,7 @@ package state
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sync"
@@ -17,6 +18,8 @@ type FileSystem interface {
 	ReadFile(name string) ([]byte, error)
 	WriteFile(name string, data []byte, perm os.FileMode) error
 	MkdirAll(path string, perm os.FileMode) error
+	ReadDir(name string) ([]fs.DirEntry, error)
+	Rename(oldpath, newpath string) error
 }
 
 // Manager manages reading/writing the state file.
@@ -84,7 +87,13 @@ func (m *Manager) Save() error {
 		return err
 	}
 
-	return m.FS.WriteFile(m.FilePath, data, 0644)
+	// Atomic Write: Write to temp file then rename
+	tmpPath := m.FilePath + ".tmp." + fmt.Sprintf("%d", time.Now().UnixNano())
+	if err := m.FS.WriteFile(tmpPath, data, 0644); err != nil {
+		return err
+	}
+
+	return m.FS.Rename(tmpPath, m.FilePath)
 }
 
 // UpdateResource updates a specific resource state and saves it.

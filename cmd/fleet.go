@@ -91,7 +91,20 @@ var factsCmd = &cobra.Command{
 
 				// Create Transport
 				// TODO: Better context management with timeouts
-				ctx := core.NewSystemContext(false, nil) // Base context
+				// For facts gathering, we can use NoOp or PtermUI. Using PtermUI might interleave output?
+				// Since we are inside a goroutine and using a spinner/results channel, we should NOT print to stdout directly.
+				// However, NewSystemContext requires UI. We can use a NoOpUI if we don't want logs.
+				// Let's create a local NoOpUI or pass PtermUI but be careful.
+				// Since we use results channel, logging inside might be distracting.
+				// But context Logger expects it.
+				// Let's use NewPtermUI but maybe we want to stifle it?
+				// For now, let's just use NewPtermUI() as it's the standard.
+				// Or better, &core.NoOpUI{} if we want it silent.
+				// Since this is "facts" command, usually we want clean output.
+				// But let's stick to PtermUI to satisfy the API.
+
+				// Actually, we can just pass nil! NewSystemContext handles nil.
+				ctx := core.NewSystemContext(false, nil, nil) // Base context with nil UI -> NoOpUI
 
 				// Initialize Transport
 				var tr core.Transport

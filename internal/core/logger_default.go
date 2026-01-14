@@ -4,17 +4,17 @@ import (
 	"context"
 	"io"
 	"log/slog"
-
-	"github.com/pterm/pterm"
+	// Self import is tricky, usually we simply use the package pterm usage replacement
+	// But since this is package core, I don't need to import core.
 )
 
 type DefaultLogger struct {
 	level   LogLevel
 	handler *slog.Logger
-	output  io.Writer
+	ui      UI
 }
 
-func NewDefaultLogger(output io.Writer, level LogLevel) *DefaultLogger {
+func NewDefaultLogger(ui UI, output io.Writer, level LogLevel) *DefaultLogger {
 	var slogLevel slog.Level
 	switch level {
 	case LevelTrace, LevelDebug:
@@ -36,41 +36,41 @@ func NewDefaultLogger(output io.Writer, level LogLevel) *DefaultLogger {
 	return &DefaultLogger{
 		level:   level,
 		handler: handler,
-		output:  output,
+		ui:      ui,
 	}
 }
 
 func (l *DefaultLogger) Trace(msg string, args ...any) {
 	if l.level <= LevelTrace {
-		pterm.Debug.WithWriter(l.output).Println("TRACE: " + msg)
+		l.ui.Debug("TRACE: " + msg)
 		l.handler.Debug(msg, args...)
 	}
 }
 
 func (l *DefaultLogger) Debug(msg string, args ...any) {
 	if l.level <= LevelDebug {
-		pterm.Debug.WithWriter(l.output).Println(msg)
+		l.ui.Debug(msg)
 		l.handler.Debug(msg, args...)
 	}
 }
 
 func (l *DefaultLogger) Info(msg string, args ...any) {
 	if l.level <= LevelInfo {
-		pterm.Info.WithWriter(l.output).Println(msg)
+		l.ui.Info(msg)
 		l.handler.Info(msg, args...)
 	}
 }
 
 func (l *DefaultLogger) Warn(msg string, args ...any) {
 	if l.level <= LevelWarn {
-		pterm.Warning.WithWriter(l.output).Println(msg)
+		l.ui.Warning(msg)
 		l.handler.Warn(msg, args...)
 	}
 }
 
 func (l *DefaultLogger) Error(msg string, args ...any) {
 	if l.level <= LevelError {
-		pterm.Error.WithWriter(l.output).Println(msg)
+		l.ui.Error(msg)
 		l.handler.Error(msg, args...)
 	}
 }
@@ -79,7 +79,7 @@ func (l *DefaultLogger) With(args ...any) Logger {
 	return &DefaultLogger{
 		level:   l.level,
 		handler: l.handler.With(args...),
-		output:  l.output,
+		ui:      l.ui,
 	}
 }
 

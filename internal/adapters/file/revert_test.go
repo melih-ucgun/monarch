@@ -21,7 +21,7 @@ func TestRevert_Creation(t *testing.T) {
 	ctx := &core.SystemContext{
 		FS:      &core.RealFS{}, // Using real FS for file operations
 		Context: nil,
-		Logger:  core.NewDefaultLogger(os.Stderr, core.LevelDebug), // Debug logging
+		Logger:  core.NewDefaultLogger(&core.NoOpUI{}, os.Stderr, core.LevelDebug), // Debug logging
 	}
 
 	targetPath := filepath.Join(tmpDir, "testfile.txt")
@@ -88,7 +88,7 @@ func TestRevert_Modification(t *testing.T) {
 
 	ctx := &core.SystemContext{
 		FS:            &core.RealFS{},
-		Logger:        core.NewDefaultLogger(os.Stderr, core.LevelDebug),
+		Logger:        core.NewDefaultLogger(&core.NoOpUI{}, os.Stderr, core.LevelDebug),
 		TxID:          "test-tx-1",
 		BackupManager: bm,
 	}
@@ -163,7 +163,7 @@ func TestRevert_Modification_NoBackup(t *testing.T) {
 
 	ctx := &core.SystemContext{
 		FS:     &core.RealFS{},
-		Logger: core.NewDefaultLogger(os.Stderr, core.LevelDebug),
+		Logger: core.NewDefaultLogger(&core.NoOpUI{}, os.Stderr, core.LevelDebug),
 		// No BackupManager -> No Backup created
 	}
 
