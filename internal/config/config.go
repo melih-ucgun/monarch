@@ -40,6 +40,64 @@ type ResourceConfig struct {
 	Prune     bool                   `yaml:"prune"`
 }
 
+// UnmarshalYAML implements custom logic to support map-based names (Distro -> Name).
+func (r *ResourceConfig) UnmarshalYAML(value *yaml.Node) error {
+	// Shadow struct to prevent infinite recursion, but with Name as interface{}
+	type rawResource struct {
+		ID        string                 `yaml:"id"`
+		Name      interface{}            `yaml:"name"` // Can be string or map[string]string
+		Type      string                 `yaml:"type"`
+		State     string                 `yaml:"state"`
+		Priority  int                    `yaml:"priority"`
+		When      string                 `yaml:"when"`
+		DependsOn []string               `yaml:"depends_on"`
+		Params    map[string]interface{} `yaml:"params"`
+		Hooks     Hooks                  `yaml:"hooks"`
+		Prune     bool                   `yaml:"prune"`
+	}
+
+	var aux rawResource
+	if err := value.Decode(&aux); err != nil {
+		return err
+	}
+
+	// Copy fields
+	r.ID = aux.ID
+	r.Type = aux.Type
+	r.State = aux.State
+	r.Priority = aux.Priority
+	r.When = aux.When
+	r.DependsOn = aux.DependsOn
+	r.Params = aux.Params
+	r.Hooks = aux.Hooks
+	r.Prune = aux.Prune
+
+	// Resolve Name
+	switch v := aux.Name.(type) {
+	case string:
+		r.Name = v
+	case map[string]interface{}:
+		// Check environment variables set by core
+		distro := os.Getenv("VETO_DISTRO")
+		// osName := os.Getenv("VETO_OS") // linux, darwin...
+
+		// Priority: Distro -> OS -> Default
+		// Note: We cast values to string
+		if val, ok := v[distro]; ok {
+			r.Name = fmt.Sprintf("%v", val)
+		} else if val, ok := v["default"]; ok {
+			r.Name = fmt.Sprintf("%v", val)
+		} else {
+			// No match found. Name remains empty.
+			// This might be caught by validation later, or intentional (if user relies on ID?)
+		}
+	default:
+		// Unknown type for name (nil or something else), leave empty
+	}
+
+	return nil
+}
+
 // Hooks defines lifecycle command hooks for a resource.
 type Hooks struct {
 	Pre      string `yaml:"pre"`       // Runs before apply
