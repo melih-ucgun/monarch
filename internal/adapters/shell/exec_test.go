@@ -13,7 +13,7 @@ func TestExecAdapter_Apply(t *testing.T) {
 	ctx := &core.SystemContext{
 		FS:        &core.RealFS{},
 		Transport: mockTransport,
-		Logger:    core.NewDefaultLogger(os.Stderr, core.LevelDebug),
+		Logger:    core.NewDefaultLogger(&core.NoOpUI{}, os.Stderr, core.LevelDebug),
 	}
 
 	mockTransport.OnExecute("echo hello", "hello", nil)
@@ -42,7 +42,7 @@ func TestExecAdapter_Check_Unless(t *testing.T) {
 	ctx := &core.SystemContext{
 		FS:        &core.RealFS{},
 		Transport: mockTransport,
-		Logger:    core.NewDefaultLogger(os.Stderr, core.LevelDebug),
+		Logger:    core.NewDefaultLogger(&core.NoOpUI{}, os.Stderr, core.LevelDebug),
 	}
 
 	// Case 1: Unless command succeeds (exit 0) -> Should Skip
@@ -69,7 +69,7 @@ func TestExecAdapter_Check_Unless_Fail(t *testing.T) {
 	ctx := &core.SystemContext{
 		FS:        &core.RealFS{},
 		Transport: mockTransport,
-		Logger:    core.NewDefaultLogger(os.Stderr, core.LevelDebug),
+		Logger:    core.NewDefaultLogger(&core.NoOpUI{}, os.Stderr, core.LevelDebug),
 	}
 
 	// Case 2: Unless command fails (exit 1) -> Should Run

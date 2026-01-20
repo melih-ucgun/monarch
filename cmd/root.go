@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 
+	_ "github.com/melih-ucgun/veto/internal/adapters/repository" // Register repository adapter
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )

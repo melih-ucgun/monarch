@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"atomicgo.dev/cursor"
+	"github.com/melih-ucgun/veto/internal/adapters/ui"
 	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/melih-ucgun/veto/internal/core"
 	"github.com/melih-ucgun/veto/internal/system"
@@ -37,7 +38,8 @@ func runInit() {
 
 	spinner, _ := pterm.DefaultSpinner.Start("Scanning system...")
 	// Init runs locally
-	detectedCtx := core.NewSystemContext(false, transport.NewLocalTransport())
+	ui := ui.NewPtermUI()
+	detectedCtx := core.NewSystemContext(false, transport.NewLocalTransport(), ui)
 	system.Detect(detectedCtx)
 	spinner.Success("System scan complete")
 	pterm.Println()

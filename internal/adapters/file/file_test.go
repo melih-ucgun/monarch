@@ -42,7 +42,7 @@ func TestFileAdapter_Apply_Backup(t *testing.T) {
 	}
 
 	mockBM := &MockBackupManager{}
-	ctx := core.NewSystemContext(false, nil)
+	ctx := core.NewSystemContext(false, nil, nil)
 	ctx.BackupManager = mockBM
 	ctx.TxID = "tx1"
 
@@ -72,7 +72,7 @@ func TestFileAdapter_Apply_Backup(t *testing.T) {
 
 func TestFileAdapter_RevertAction(t *testing.T) {
 	mockBM := &MockBackupManager{}
-	ctx := core.NewSystemContext(false, nil)
+	ctx := core.NewSystemContext(false, nil, nil)
 	ctx.BackupManager = mockBM
 
 	// Init Adapter

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/melih-ucgun/veto/internal/adapters/ui"
 	"github.com/melih-ucgun/veto/internal/config"
 	"github.com/melih-ucgun/veto/internal/consts"
 	"github.com/melih-ucgun/veto/internal/core"
@@ -54,7 +55,8 @@ var addCmd = &cobra.Command{
 		pterm.Info.Printf("Target Config: %s\n", configPath)
 
 		// Only local context needed for adding user
-		ctx := core.NewSystemContext(false, transport.NewLocalTransport())
+		ui := ui.NewPtermUI()
+		ctx := core.NewSystemContext(false, transport.NewLocalTransport(), ui)
 		system.Detect(ctx)
 
 		for _, arg := range args {

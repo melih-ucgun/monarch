@@ -1,6 +1,7 @@
 package state
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -22,6 +23,14 @@ func (fs *MockRealFS) WriteFile(name string, data []byte, perm os.FileMode) erro
 
 func (fs *MockRealFS) MkdirAll(path string, perm os.FileMode) error {
 	return os.MkdirAll(path, perm)
+}
+
+func (fs *MockRealFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	return os.ReadDir(name)
+}
+
+func (fs *MockRealFS) Rename(oldpath, newpath string) error {
+	return os.Rename(oldpath, newpath)
 }
 
 func TestHistoryManager(t *testing.T) {

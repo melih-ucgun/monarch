@@ -133,6 +133,14 @@ func (m *MockFileSystem) WriteFile(name string, data []byte, perm os.FileMode) e
 }
 func (m *MockFileSystem) RemoveAll(path string) error                { return nil }
 func (m *MockFileSystem) ReadDir(name string) ([]fs.DirEntry, error) { return nil, nil }
+func (m *MockFileSystem) Rename(oldpath, newpath string) error {
+	if content, ok := m.Content[oldpath]; ok {
+		m.Content[newpath] = content
+		delete(m.Content, oldpath)
+		return nil
+	}
+	return os.ErrNotExist
+}
 
 // MockFile implements core.File
 type MockFile struct {

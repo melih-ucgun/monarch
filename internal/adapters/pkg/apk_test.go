@@ -60,7 +60,7 @@ func TestApkAdapter_Check(t *testing.T) {
 			}
 
 			adapter := NewApkAdapter(tt.packageName, map[string]interface{}{"state": tt.state}).(*ApkAdapter)
-			needsAction, err := adapter.Check(core.NewSystemContext(false, mockTr))
+			needsAction, err := adapter.Check(core.NewSystemContext(false, mockTr, nil))
 
 			if err != nil {
 				t.Fatalf("Check returned error: %v", err)
@@ -87,7 +87,7 @@ func TestApkAdapter_Apply(t *testing.T) {
 			},
 		}
 
-		ctx := core.NewSystemContext(false, mockTr)
+		ctx := core.NewSystemContext(false, mockTr, nil)
 		result, err := adapter.Apply(ctx)
 
 		if err != nil {
@@ -117,7 +117,7 @@ func TestApkAdapter_Apply(t *testing.T) {
 			},
 		}
 
-		ctx := core.NewSystemContext(false, mockTr)
+		ctx := core.NewSystemContext(false, mockTr, nil)
 		result, err := adapter.Apply(ctx)
 
 		if err != nil {

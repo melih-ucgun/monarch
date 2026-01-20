@@ -12,7 +12,7 @@ func TestFirewall_Check_Exists(t *testing.T) {
 	ctx := &core.SystemContext{
 		FS:        &core.RealFS{},
 		Transport: mockTransport,
-		Logger:    core.NewDefaultLogger(os.Stderr, core.LevelDebug),
+		Logger:    core.NewDefaultLogger(&core.NoOpUI{}, os.Stderr, core.LevelDebug),
 	}
 
 	// Mock UFW Status output showing rule exists
@@ -39,7 +39,7 @@ func TestFirewall_Check_NotExists(t *testing.T) {
 	ctx := &core.SystemContext{
 		FS:        &core.RealFS{},
 		Transport: mockTransport,
-		Logger:    core.NewDefaultLogger(os.Stderr, core.LevelDebug),
+		Logger:    core.NewDefaultLogger(&core.NoOpUI{}, os.Stderr, core.LevelDebug),
 	}
 
 	mockTransport.OnExecute("ufw status numbered", "Status: active\n\n     To                         Action      From\n     --                         ------      ----", nil)
@@ -65,7 +65,7 @@ func TestFirewall_Apply_Allow(t *testing.T) {
 	ctx := &core.SystemContext{
 		FS:        &core.RealFS{},
 		Transport: mockTransport,
-		Logger:    core.NewDefaultLogger(os.Stderr, core.LevelDebug),
+		Logger:    core.NewDefaultLogger(&core.NoOpUI{}, os.Stderr, core.LevelDebug),
 	}
 
 	// First output (Check): empty
@@ -99,7 +99,7 @@ func TestFirewall_Apply_Delete(t *testing.T) {
 	ctx := &core.SystemContext{
 		FS:        &core.RealFS{},
 		Transport: mockTransport,
-		Logger:    core.NewDefaultLogger(os.Stderr, core.LevelDebug),
+		Logger:    core.NewDefaultLogger(&core.NoOpUI{}, os.Stderr, core.LevelDebug),
 	}
 
 	// First output (Check): exists
