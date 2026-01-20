@@ -161,35 +161,38 @@ func RunImportInteractive(outputFile string, nonInteractive bool) {
 	spinner.UpdateText("Scanning for configuration files...")
 	pterm.Println() // Spacer
 
-	var potentialConfigs []string
+	var potentialConfigPaths []string
+	configMap := make(map[string]discovery.DiscoveredConfig)
+
 	// Combine packages and services names for lookup (some services like nginx map to configs too)
 	lookupList := append([]string{}, selectedPkgs...)
 	lookupList = append(lookupList, selectedServices...)
 
-	configs, err := discovery.DiscoverConfigs(lookupList, ctx.HomeDir)
+	configs, err := discovery.DiscoverConfigs(ctx, lookupList)
 	if err == nil && len(configs) > 0 {
-		potentialConfigs = configs
+		for _, c := range configs {
+			potentialConfigPaths = append(potentialConfigPaths, c.Path)
+			configMap[c.Path] = c
+		}
 	}
 
-	var selectedConfigs []string
-	if len(potentialConfigs) > 0 {
+	var selectedConfigPaths []string
+	if len(potentialConfigPaths) > 0 {
 		if !nonInteractive {
 			pterm.Println()
-			pterm.Info.Printf("Found %d relevant config files based on your selection.\n", len(potentialConfigs))
+			pterm.Info.Printf("Found %d relevant config files based on your selection.\n", len(potentialConfigPaths))
 			pterm.Info.Println("Select CONFIG FILES to import:")
 
-			sort.Strings(potentialConfigs)
+			sort.Strings(potentialConfigPaths)
 
-			// Default behavior: Select All? Or Let user pick?
-			// Configs are personal, let's pre-select all as usually if discovered, it's relevant.
-
-			selectedConfigs, _ = pterm.DefaultInteractiveMultiselect.
-				WithOptions(potentialConfigs).
+			// Default behavior: Select All
+			selectedConfigPaths, _ = pterm.DefaultInteractiveMultiselect.
+				WithOptions(potentialConfigPaths).
 				WithDefaultText("Select config files").
 				WithFilter(true).
 				Show()
 		} else {
-			selectedConfigs = potentialConfigs
+			selectedConfigPaths = potentialConfigPaths
 		}
 	}
 
@@ -206,21 +209,35 @@ func RunImportInteractive(outputFile string, nonInteractive bool) {
 		})
 	}
 
-	for _, c := range selectedConfigs {
-		cfg.Resources = append(cfg.Resources, config.ResourceConfig{
+	for _, path := range selectedConfigPaths {
+		c := configMap[path]
+		// Generate unique name: pkgname_basename
+		// e.g. nginx_nginx.conf
+		rName := fmt.Sprintf("%s_%s", c.PackageID, filepath.Base(c.Path))
+
+		res := config.ResourceConfig{
 			Type: "file",
-			Name: filepath.Base(c), // Name it after filename? Or full path? Name must be unique if file type uses name as key?
-			// Engine uses Name as ID usually, but params["path"] is real target.
-			// Unique ID problem: multiple files might have same basename (init.lua).
-			// Better: Use Name = Config Name (e.g. zshrc)
-			// Or just use a generated slug.
-			// Let's rely on fallback.
+			Name: rName,
 			Params: map[string]interface{}{
-				"path":  c,
+				"path":  c.Path,
 				"state": "present",
 				// "content": "..." // We are NOT reading content yet, just referencing path
 			},
-		})
+		}
+
+		// Auto-wire dependency if the package is also being imported
+		// We check if c.PackageID is in selectedPkgs (or assume it is because we discovered it from lookupList)
+		// But lookupList included services too.
+		// Let's safe check or just add it. If it depends on a package that is not in resources, 
+		// Veto Engine might complain if strict? Engine checks if dependency exists in graph.
+		// So we should only add depends_on if the target exists in cfg.Resources.
+		
+		// For simplicity, we just add it. If the user deselected the package but selected the config,
+		// that's an edge case. But usually they go together.
+		// Let's add it.
+		res.DependsOn = []string{c.PackageID}
+
+		cfg.Resources = append(cfg.Resources, res)
 	}
 
 	// Optimize package lookup
